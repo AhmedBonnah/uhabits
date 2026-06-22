@@ -63,7 +63,7 @@ open class ListHabitsBehavior(
     }
 
     fun onEdit(habit: Habit, date: LocalDate, x: Float, y: Float) {
-        val list = if (habit.isSubHabit()) habit.group!!.habitList else habitList
+        val list = habit.group?.habitList ?: habitList
         val entry = habit.computedEntries.get(date)
         if (habit.type == HabitType.NUMERICAL) {
             val oldValue = entry.value.toDouble() / 1000
@@ -173,7 +173,7 @@ open class ListHabitsBehavior(
     }
 
     fun onToggle(habit: Habit, date: LocalDate, value: Int, notes: String, x: Float, y: Float) {
-        val list = if (habit.isSubHabit()) habit.group!!.habitList else habitList
+        val list = habit.group?.habitList ?: habitList
         commandRunner.run(
             CreateRepetitionCommand(list, habit, date, value, notes)
         )
