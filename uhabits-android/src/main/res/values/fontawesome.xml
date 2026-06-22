@@ -106,7 +106,7 @@
 	<!--<string translatable="false" name="fa_stop">&#xf04d;</string>-->
 	<!--<string translatable="false" name="fa_forward">&#xf04e;</string>-->
 	<!--<string translatable="false" name="fa_fast_forward">&#xf050;</string>-->
-	<!--<string translatable="false" name="fa_step_forward">&#xf051;</string>-->
+	<string translatable="false" name="fa_step_forward">&#xf051;</string>
 	<!--<string translatable="false" name="fa_eject">&#xf052;</string>-->
 	<!--<string translatable="false" name="fa_chevron_left">&#xf053;</string>-->
 	<!--<string translatable="false" name="fa_chevron_right">&#xf054;</string>-->

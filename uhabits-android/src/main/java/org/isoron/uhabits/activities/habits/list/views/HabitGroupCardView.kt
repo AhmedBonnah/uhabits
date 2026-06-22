@@ -103,8 +103,13 @@ class HabitGroupCardView(
         innerFrame = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
-            elevation = dp(1f)
+            val marginH = dp(8f).toInt()
+            val marginV = dp(6f).toInt()
+            layoutParams = LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                setMargins(marginH, marginV, marginH, marginV)
+            }
+            // Increase elevation slightly for floating look
+            elevation = dp(4f)
 
             addView(scoreRing)
             addView(groupIndicator)
@@ -120,8 +125,6 @@ class HabitGroupCardView(
 
         clipToPadding = false
         layoutParams = LayoutParams(MATCH_PARENT, WRAP_CONTENT)
-        val margin = dp(3f).toInt()
-        setPadding(margin, 0, margin, margin)
         addView(innerFrame)
     }
 
@@ -182,8 +185,8 @@ class HabitGroupCardView(
 
     private fun updateBackground(isSelected: Boolean) {
         val background = when (isSelected) {
-            true -> R.drawable.selected_box
-            false -> R.drawable.ripple
+            true -> R.drawable.glass_selected
+            false -> R.drawable.glass_ripple
         }
         innerFrame.setBackgroundResource(background)
     }

@@ -157,7 +157,7 @@ class CheckmarkButtonView(
                 else -> lowContrastColor
             }
             val id = when (value) {
-                SKIP -> R.string.fa_check
+                SKIP -> R.string.fa_step_forward
                 NO -> R.string.fa_times
                 UNKNOWN -> {
                     if (preferences.areQuestionMarksEnabled) {
