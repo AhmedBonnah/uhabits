@@ -29,14 +29,12 @@ data class AddToGroupCommand(
 ) : Command {
     override fun run() {
         for (habit in selected) {
-            val entries = habit.originalEntries.getKnown()
             val oldGroup = habit.group
-            (oldGroup?.habitList ?: habitList).remove(habit)
+            val sourceList = (oldGroup?.habitList ?: habitList).unfiltered
             habit.groupId = hgr.id
             habit.groupUUID = hgr.uuid
             habit.group = hgr
-            hgr.habitList.add(habit)
-            entries.forEach { habit.originalEntries.add(it) }
+            sourceList.move(habit, hgr.habitList.unfiltered)
             habit.observable.notifyListeners()
         }
     }

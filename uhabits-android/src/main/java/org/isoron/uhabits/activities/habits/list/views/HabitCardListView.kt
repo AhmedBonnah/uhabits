@@ -203,7 +203,7 @@ class HabitCardListView(
     }
 
     interface Controller {
-        fun drop(from: Int, to: Int) {}
+        fun drop(from: Int, to: Int): Boolean = false
         fun onItemClick(pos: Int) {}
         fun onItemLongClick(pos: Int) {}
         fun startDrag(position: Int) {}
@@ -239,8 +239,7 @@ class HabitCardListView(
             from: ViewHolder,
             to: ViewHolder
         ): Boolean {
-            controller.value.drop(from.adapterPosition, to.adapterPosition)
-            return true
+            return controller.value.drop(from.adapterPosition, to.adapterPosition)
         }
 
         override fun onSwiped(

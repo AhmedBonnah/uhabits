@@ -122,7 +122,8 @@ open class BaseUnitTest {
         var inputStream = javaClass.getResourceAsStream(assetPath)
         if (inputStream != null) return inputStream
         val pwd = Paths.get(".").toAbsolutePath().normalize().toString()
-        val fullPath = "$pwd/assets/test/$assetPath"
+        val suffix = if (File("$pwd/uhabits-core").exists()) "/uhabits-core" else ""
+        val fullPath = "$pwd$suffix/assets/test/$assetPath"
         val file = File(fullPath)
         if (file.exists() && file.canRead()) inputStream = FileInputStream(file)
         if (inputStream != null) return inputStream

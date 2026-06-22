@@ -155,6 +155,21 @@
                 </LinearLayout>
             </FrameLayout>
 
+            <!-- Group selection -->
+            <FrameLayout
+                android:id="@+id/groupOuterBox"
+                style="@style/FormOuterBox">
+                <LinearLayout style="@style/FormInnerBox">
+                    <TextView
+                        style="@style/FormLabel"
+                        android:text="@string/group" />
+                    <TextView
+                        style="@style/FormDropdown"
+                        android:id="@+id/groupPicker"
+                        android:text="@string/no_group" />
+                </LinearLayout>
+            </FrameLayout>
+
             <!-- Target value, unit and frequency -->
             <FrameLayout
                 android:id="@+id/unitOuterBox"

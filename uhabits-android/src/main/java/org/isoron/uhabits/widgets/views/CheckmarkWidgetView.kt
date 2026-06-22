@@ -68,8 +68,14 @@ class CheckmarkWidgetView : HabitWidgetView {
         val fgColor: Int
         setShadowAlpha(0x4f)
         when (entryState) {
-            YES_MANUAL, SKIP, YES_AUTO -> {
+            YES_MANUAL, YES_AUTO -> {
                 bgColor = activeColor
+                fgColor = res.getColor(R.attr.contrast0)
+                backgroundPaint!!.color = bgColor
+                frame!!.setBackgroundDrawable(background)
+            }
+            SKIP -> {
+                bgColor = res.getColor(R.attr.yellowColor)
                 fgColor = res.getColor(R.attr.contrast0)
                 backgroundPaint!!.color = bgColor
                 frame!!.setBackgroundDrawable(background)
@@ -109,8 +115,7 @@ class CheckmarkWidgetView : HabitWidgetView {
             (max(0, entryValue) / 1000.0).toShortString()
         } else {
             when (entryState) {
-                YES_MANUAL, YES_AUTO -> resources.getString(R.string.fa_check)
-                SKIP -> resources.getString(R.string.fa_skipped)
+                YES_MANUAL, YES_AUTO, SKIP -> resources.getString(R.string.fa_check)
                 UNKNOWN -> {
                     run {
                         if (preferences!!.areQuestionMarksEnabled) {

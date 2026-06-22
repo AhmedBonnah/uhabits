@@ -29,7 +29,6 @@ data class HabitMatcher(
         if (isReminderRequired && !habit.hasReminder()) return false
         if (!isCompletedAllowed && habit.isCompletedToday()) return false
         if (!isEnteredAllowed && habit.isEnteredToday()) return false
-        if (habit.collapsed) return false
         return true
     }
 

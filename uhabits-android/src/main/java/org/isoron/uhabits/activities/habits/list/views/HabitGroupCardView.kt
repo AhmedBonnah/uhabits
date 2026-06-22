@@ -61,6 +61,7 @@ class HabitGroupCardView(
     private var innerFrame: LinearLayout
     private var label: TextView
     private var scoreRing: RingView
+    private var groupIndicator: TextView
 
     private var currentToggleTaskId = 0
 
@@ -74,6 +75,16 @@ class HabitGroupCardView(
                 gravity = Gravity.CENTER
             }
             setThickness(thickness)
+        }
+
+        groupIndicator = TextView(context).apply {
+            text = "G"
+            textSize = 12f
+            setTypeface(null, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setMargins(0, 0, dp(4f).toInt(), 0)
+            }
         }
 
         label = TextView(context).apply {
@@ -96,6 +107,7 @@ class HabitGroupCardView(
             elevation = dp(1f)
 
             addView(scoreRing)
+            addView(groupIndicator)
             addView(label)
             addView(addButtonView)
             addView(collapseButtonView)
@@ -150,6 +162,9 @@ class HabitGroupCardView(
         val c = getActiveColor(source)
         label.apply {
             text = source.name
+            setTextColor(c)
+        }
+        groupIndicator.apply {
             setTextColor(c)
         }
         scoreRing.apply {

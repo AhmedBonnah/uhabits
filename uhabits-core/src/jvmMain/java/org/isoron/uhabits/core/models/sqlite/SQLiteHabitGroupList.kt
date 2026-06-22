@@ -34,6 +34,7 @@ class SQLiteHabitGroupList(
             rec.copyTo(h)
             list.add(h)
         }
+        attachHabitsToGroups()
         if (shouldRebuildOrder) rebuildOrder()
     }
 
@@ -226,7 +227,7 @@ class SQLiteHabitGroupList(
     }
 
     @Synchronized
-    fun reload() {
+    override fun reload() {
         loaded = false
     }
 }

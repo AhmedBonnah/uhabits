@@ -216,7 +216,7 @@
     <string name="habit_group_example">A group to organize similar habits together. E.g. Exercise: Running, Cycling, Gym, etc.</string>
     <string name="x_times_per_week">%d times per week</string>
     <string name="x_times_per_month">%d times per month</string>
-    <string name="x_times_per_y_days">%d times in %d days</string>
+    <string name="x_times_per_y_days">%1$d times in %2$d days</string>
     <string name="yes_or_no_short_example">e.g. Exercise</string>
     <string name="color">Color</string>
     <string name="example_target">e.g. 15</string>
@@ -245,4 +245,6 @@
     <string name="pref_animations_description">Disable confetti animation after adding a checkmark.</string>
     <string name="no_sub_habits">Group contains no habits.</string>
     <string name="no_habit_groups">No habit groups</string>
+    <string name="group">Group</string>
+    <string name="no_group">None</string>
 </resources>

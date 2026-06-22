@@ -47,8 +47,11 @@ class HabitCardListCacheTest : BaseUnitTest() {
         }
         habitGroupList.removeAll()
         for (i in 0..2) {
-            habitGroupList.add(groupFixtures.createEmptyHabitGroup(id = 10L + i.toLong()))
+            val hgr = groupFixtures.createEmptyHabitGroup(id = 10L + i.toLong())
+            habitGroupList.add(hgr)
+            hgr.position = 10 + i
         }
+        habitGroupList.update(emptyList())
         cache = HabitCardListCache(habitList, habitGroupList, commandRunner, taskRunner, mock())
         cache.setCheckmarkCount(10)
         cache.refreshAllHabits()

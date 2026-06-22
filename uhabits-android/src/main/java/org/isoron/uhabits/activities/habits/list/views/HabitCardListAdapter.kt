@@ -20,9 +20,8 @@ package org.isoron.uhabits.activities.habits.list.views
 
 import android.annotation.SuppressLint
 import android.view.ViewGroup
-import androidx.recyclerview.widget.RecyclerView
-import me.tatarka.inject.annotations.Inject
 import androidx.recyclerview.widget.RecyclerView.Adapter
+import me.tatarka.inject.annotations.Inject
 import org.isoron.uhabits.activities.habits.list.MAX_CHECKMARK_COUNT
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitGroup
@@ -209,8 +208,19 @@ class HabitCardListAdapter(
         observable.notifyListeners()
     }
 
+    // True if the last performReorder was a group with visible sub-habits.
+    // In that case we need notifyDataSetChanged instead of notifyItemMoved
+    // to avoid RecyclerView IndexOutOfBoundsException.
+    private var lastReorderWasGroupWithSubHabits = false
+
+    @SuppressLint("NotifyDataSetChanged")
     override fun onItemMoved(oldPosition: Int, newPosition: Int) {
-        notifyItemMoved(oldPosition, newPosition)
+        if (lastReorderWasGroupWithSubHabits) {
+            lastReorderWasGroupWithSubHabits = false
+            notifyDataSetChanged()
+        } else {
+            notifyItemMoved(oldPosition, newPosition)
+        }
         observable.notifyListeners()
     }
 
@@ -219,7 +229,9 @@ class HabitCardListAdapter(
         observable.notifyListeners()
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     override fun onRefreshFinished() {
+        notifyDataSetChanged()
         observable.notifyListeners()
     }
 
@@ -256,7 +268,17 @@ class HabitCardListAdapter(
      * @param from the habit that should be moved
      * @param to   the habit that currently occupies the desired position
      */
+    fun getTopLevelItems(): List<Any> {
+        return cache.getTopLevelItems()
+    }
+
     fun performReorder(from: Int, to: Int) {
+        // Check if the item being reordered is a group with visible sub-habits.
+        // If so, a single notifyItemMoved won't be enough since the group occupies
+        // multiple rows — we need to track this and use notifyDataSetChanged instead.
+        val hgr = cache.getHabitGroupByPosition(from)
+        lastReorderWasGroupWithSubHabits = hgr != null && !hgr.collapsed &&
+            cache.getSubHabitCountForGroup(hgr) > 0
         cache.reorder(from, to)
     }
 

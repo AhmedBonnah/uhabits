@@ -24,8 +24,8 @@ import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
-import org.isoron.uhabits.core.models.HabitGroupList
 import org.isoron.platform.time.getToday
+import org.isoron.uhabits.core.models.HabitGroupList
 import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.preferences.Preferences

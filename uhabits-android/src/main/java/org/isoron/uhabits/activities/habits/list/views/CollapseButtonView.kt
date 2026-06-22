@@ -37,9 +37,17 @@ class CollapseButtonView(
 
     override fun onClick(v: View) {
         collapsed = !collapsed
-        habitGroup!!.collapsed = collapsed
-        (context as ListHabitsActivity).component.listHabitsMenu.behavior.onPreferencesChanged()
-        invalidate()
+        val group = habitGroup ?: return
+        val target = group.parent ?: group
+        target.collapsed = collapsed
+
+        val appComponent = (context as ListHabitsActivity).appComponent
+        appComponent.habitGroupList.update(target)
+
+        val component = (context as ListHabitsActivity).component
+        component.habitCardListAdapter.refresh()
+
+        drawer.animateRotation()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -60,9 +68,11 @@ class CollapseButtonView(
         private val rect = RectF()
         private val highContrastColor = sres.getColor(R.attr.contrast100)
 
-        private var rotationAngle = 0f
-        private var offset_y = 0.4f
-        private var offset_x = 0f
+        private var rotationAngle = if (collapsed) 90f else 0f
+        private var offset_y = if (collapsed) 0f else 0.4f
+        private var offset_x = if (collapsed) -0.4f else 0f
+        private var animator: android.animation.ValueAnimator? = null
+
         private val paint = TextPaint().apply {
             typeface = getFontAwesome()
             isAntiAlias = true
@@ -70,14 +80,27 @@ class CollapseButtonView(
         }
 
         fun rotate() {
-            if (collapsed) {
-                rotationAngle = 90f
-                offset_y = 0f
-                offset_x = -0.4f
-            } else {
-                rotationAngle = 0f
-                offset_y = 0.4f
-                offset_x = 0f
+            rotationAngle = if (collapsed) 90f else 0f
+            offset_y = if (collapsed) 0f else 0.4f
+            offset_x = if (collapsed) -0.4f else 0f
+        }
+
+        fun animateRotation() {
+            animator?.cancel()
+            val targetRotation = if (collapsed) 90f else 0f
+            val targetOffsetY = if (collapsed) 0f else 0.4f
+            val targetOffsetX = if (collapsed) -0.4f else 0f
+
+            animator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 200
+                addUpdateListener { animation ->
+                    val fraction = animation.animatedFraction
+                    rotationAngle = rotationAngle + (targetRotation - rotationAngle) * fraction
+                    offset_y = offset_y + (targetOffsetY - offset_y) * fraction
+                    offset_x = offset_x + (targetOffsetX - offset_x) * fraction
+                    invalidate()
+                }
+                start()
             }
         }
 
@@ -94,8 +117,8 @@ class CollapseButtonView(
             rect.set(0f, 0f, width.toFloat(), height.toFloat())
             rect.offset(offset_x * em, offset_y * em)
 
-            canvas.save() // Save the current state of the canvas
-            canvas.rotate(rotationAngle, rect.centerX(), rect.centerY()) // Rotate the canvas
+            canvas.save()
+            canvas.rotate(rotationAngle, rect.centerX(), rect.centerY())
             canvas.drawText(label, rect.centerX(), rect.centerY(), paint)
             canvas.restore()
         }

@@ -21,9 +21,11 @@ package org.isoron.uhabits.core.ui.screens.habits.list
 import me.tatarka.inject.annotations.Inject
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
+import org.isoron.uhabits.core.commands.AddToGroupCommand
 import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.commands.RefreshParentGroupCommand
+import org.isoron.uhabits.core.commands.RemoveFromGroupCommand
 import org.isoron.uhabits.core.models.Entry.Companion.YES_MANUAL
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitGroup
@@ -114,6 +116,14 @@ open class ListHabitsBehavior(
         screen.showIntroScreen()
     }
 
+    fun onAddHabitToGroup(habit: Habit, group: HabitGroup) {
+        commandRunner.run(AddToGroupCommand(habitList, group, listOf(habit)))
+    }
+
+    fun onRemoveHabitFromGroup(habit: Habit) {
+        commandRunner.run(RemoveFromGroupCommand(habitList, listOf(habit)))
+    }
+
     fun onReorderHabit(from: Habit, to: Habit) {
         if (from.group == to.group) {
             val list = from.group?.habitList ?: habitList
@@ -123,6 +133,14 @@ open class ListHabitsBehavior(
 
     fun onReorderHabitGroup(from: HabitGroup, to: HabitGroup) {
         taskRunner.execute { habitGroupList.reorder(from, to) }
+    }
+
+    fun onReorderTopLevelItems(items: List<Any>) {
+        taskRunner.execute {
+            habitList.reorderTopLevelItems(items)
+            habitList.reload()
+            habitGroupList.reload()
+        }
     }
 
     fun onRepairDB() {

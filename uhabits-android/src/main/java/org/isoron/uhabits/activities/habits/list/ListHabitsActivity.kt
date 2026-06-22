@@ -30,9 +30,11 @@ import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat.checkSelfPermission
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.isoron.platform.time.LocalDate
+import org.isoron.uhabits.AndroidDirFinder
 import org.isoron.uhabits.BaseExceptionHandler
 import org.isoron.uhabits.HabitsApplication
 import org.isoron.uhabits.activities.habits.list.views.HabitCardListAdapter
@@ -47,6 +49,7 @@ import org.isoron.uhabits.inject.create
 import org.isoron.uhabits.utils.applyRootViewInsets
 import org.isoron.uhabits.utils.dismissCurrentDialog
 import org.isoron.uhabits.utils.restartWithFade
+import java.io.File
 
 class ListHabitsActivity : AppCompatActivity(), Preferences.Listener {
 
@@ -101,6 +104,30 @@ class ListHabitsActivity : AppCompatActivity(), Preferences.Listener {
         component.listHabitsBehavior.onStartup()
         rootView.applyRootViewInsets()
         setContentView(rootView)
+        checkAndShowCrashLog()
+    }
+
+    private fun checkAndShowCrashLog() {
+        val logDir = AndroidDirFinder(this).getFilesDir("Logs") ?: return
+        val crashFile = File(logDir, "last_crash.txt")
+        if (!crashFile.exists()) return
+        val crashText = try { crashFile.readText() } catch (e: Exception) { return }
+        Snackbar.make(rootView, "⚠️ App crashed last time. Share crash log?", Snackbar.LENGTH_INDEFINITE)
+            .setAction("Share") {
+                val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("Crash Log", crashText)
+                clipboard.setPrimaryClip(clip)
+                android.widget.Toast.makeText(this, "Crash log copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, "Crash log – Loop Habit Tracker v${org.isoron.uhabits.BuildConfig.VERSION_NAME}")
+                    putExtra(Intent.EXTRA_TEXT, crashText)
+                }
+                startActivity(Intent.createChooser(intent, "Share crash log"))
+                crashFile.delete()
+            }
+            .show()
     }
 
     override fun onPause() {

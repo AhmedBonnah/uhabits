@@ -154,6 +154,12 @@
                 app:iconSpaceReserved="false" />
 
         <Preference
+                android:key="viewCrashLogs"
+                android:title="View crash logs"
+                android:summary="Share the last crash log with the developer"
+                app:iconSpaceReserved="false" />
+
+        <Preference
                 android:key="repairDB"
                 android:title="@string/repair_database"
                 app:iconSpaceReserved="false" />

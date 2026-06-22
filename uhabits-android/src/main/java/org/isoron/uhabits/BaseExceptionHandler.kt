@@ -19,6 +19,9 @@
 package org.isoron.uhabits
 
 import android.app.Activity
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
 
 class BaseExceptionHandler(private val activity: Activity) : Thread.UncaughtExceptionHandler {
 
@@ -30,7 +33,33 @@ class BaseExceptionHandler(private val activity: Activity) : Thread.UncaughtExce
         if (thread == null) return
         try {
             ex.printStackTrace()
-            AndroidBugReporter(activity).dumpBugReportToFile()
+            val reporter = AndroidBugReporter(activity)
+            reporter.dumpBugReportToFile()
+
+            // Write a "last_crash.txt" so the app can detect and surface it on next launch
+            val sw = StringWriter()
+            ex.printStackTrace(PrintWriter(sw))
+            val crashMsg = buildString {
+                appendLine("Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                appendLine("Thread: ${thread.name}")
+                appendLine()
+                append(sw.toString())
+                appendLine()
+                appendLine("--- Logcat ---")
+                try {
+                    append(reporter.getLogcat())
+                } catch (ignored: Exception) {}
+            }
+            val logDir = AndroidDirFinder(activity).getFilesDir("Logs")
+            if (logDir != null) {
+                File(logDir, "last_crash.txt").writeText(crashMsg)
+            }
+
+            try {
+                val clipboard = activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("Crash Log", crashMsg)
+                clipboard.setPrimaryClip(clip)
+            } catch (ignored: Exception) {}
         } catch (e: Exception) {
             e.printStackTrace()
         }

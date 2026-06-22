@@ -18,8 +18,8 @@
  */
 package org.isoron.uhabits.core.ui.screens.habits.list
 
-import org.isoron.uhabits.core.commands.ArchiveHabitGroupsCommand
 import me.tatarka.inject.annotations.Inject
+import org.isoron.uhabits.core.commands.ArchiveHabitGroupsCommand
 import org.isoron.uhabits.core.commands.ArchiveHabitsCommand
 import org.isoron.uhabits.core.commands.ChangeHabitColorCommand
 import org.isoron.uhabits.core.commands.ChangeHabitGroupColorCommand

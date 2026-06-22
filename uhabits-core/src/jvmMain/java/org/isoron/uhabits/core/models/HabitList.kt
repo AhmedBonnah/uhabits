@@ -34,8 +34,6 @@ abstract class HabitList : Iterable<Habit> {
     @JvmField
     protected val filter: HabitMatcher
 
-    abstract var collapsed: Boolean
-
     var groupId: Long? = null
 
     /**
@@ -54,6 +52,14 @@ abstract class HabitList : Iterable<Habit> {
         observable = ModelObservable()
         this.filter = filter
     }
+
+    /**
+     * Returns the parent list if this is a filtered list, or itself otherwise.
+     * Use this when modifying the list (e.g. adding or moving habits) because
+     * filtered lists cannot be modified directly.
+     */
+    open val unfiltered: HabitList
+        get() = this
 
     /**
      * Inserts a new habit in the list.
@@ -238,6 +244,14 @@ abstract class HabitList : Iterable<Habit> {
             csv.writeNext(cols, false)
         }
         csv.close()
+    }
+
+    open fun reload() {}
+    open fun reorderTopLevelItems(items: List<Any>) {}
+
+    open fun move(habit: Habit, target: HabitList) {
+        remove(habit)
+        target.add(habit)
     }
 
     abstract fun resort()

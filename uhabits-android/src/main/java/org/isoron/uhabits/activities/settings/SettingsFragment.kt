@@ -38,6 +38,7 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.recyclerview.widget.RecyclerView
 import org.isoron.platform.time.DayOfWeek
 import org.isoron.platform.time.JavaLocalDateFormatter
+import org.isoron.uhabits.AndroidDirFinder
 import org.isoron.uhabits.HabitsApplication
 import org.isoron.uhabits.R
 import org.isoron.uhabits.activities.habits.list.RESULT_BUG_REPORT
@@ -53,6 +54,7 @@ import org.isoron.uhabits.utils.StyledResources
 import org.isoron.uhabits.utils.applyBottomInset
 import org.isoron.uhabits.utils.startActivitySafely
 import org.isoron.uhabits.widgets.WidgetUpdater
+import java.io.File
 import java.util.Locale
 
 class SettingsFragment : PreferenceFragmentCompat(), OnSharedPreferenceChangeListener {
@@ -151,8 +153,28 @@ class SettingsFragment : PreferenceFragmentCompat(), OnSharedPreferenceChangeLis
                 startActivityForResult(intent, PUBLIC_BACKUP_REQUEST_CODE)
                 return true
             }
+            "viewCrashLogs" -> {
+                showCrashLogs()
+                return true
+            }
         }
         return super.onPreferenceTreeClick(preference)
+    }
+
+    private fun showCrashLogs() {
+        val logDir = AndroidDirFinder(requireContext()).getFilesDir("Logs")
+        val crashFile = if (logDir != null) File(logDir, "last_crash.txt") else null
+        if (crashFile == null || !crashFile.exists()) {
+            android.widget.Toast.makeText(requireContext(), "No crash logs found.", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val crashText = try { crashFile.readText() } catch (e: Exception) { "Could not read log." }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "Crash log – Loop Habit Tracker")
+            putExtra(Intent.EXTRA_TEXT, crashText)
+        }
+        startActivity(Intent.createChooser(intent, "Share crash log"))
     }
 
     override fun onResume() {

@@ -66,7 +66,7 @@ class HabitGroupPickerDialog : Activity() {
             return
         }
 
-        setContentView(R.layout.widget_configure_activity)
+        setContentView(R.layout.activity_habit_group_picker)
         val listView = findViewById<ListView>(R.id.listView)
 
         with(listView) {
@@ -77,6 +77,21 @@ class HabitGroupPickerDialog : Activity() {
             )
             setOnItemClickListener { parent, view, position, id ->
                 performTransfer(groupIds[position])
+            }
+        }
+
+        findViewById<android.view.View>(R.id.buttonCancel).setOnClickListener {
+            finish()
+        }
+
+        findViewById<android.view.View>(R.id.dialogContainer).setOnClickListener {
+            finish()
+        }
+
+        // Prevent clicks inside the dialog card from dismissing it
+        listView.parent.let { card ->
+            (card as android.view.View).setOnClickListener {
+                // Do nothing
             }
         }
     }

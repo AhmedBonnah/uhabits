@@ -46,26 +46,53 @@ class HabitCardListController(
         adapter.observable.addListener(this)
     }
 
-    override fun drop(from: Int, to: Int) {
-        if (from == to) return
+    override fun drop(from: Int, to: Int): Boolean {
+        if (from == to) return false
         cancelSelection()
 
         val habitFrom = adapter.getHabit(from)
         val habitTo = adapter.getHabit(to)
-        if (habitFrom != null) {
-            if (habitTo != null) {
-                adapter.performReorder(from, to)
-                behavior.onReorderHabit(habitFrom, habitTo)
-            }
-            return
-        }
+        val groupTo = adapter.getHabitGroup(to)
 
-        var hgrFrom = adapter.getHabitGroup(from)!!
-        if (hgrFrom.parent != null) hgrFrom = hgrFrom.parent!!
-        var hgrTo = adapter.getHabitGroup(to) ?: return
-        if (hgrTo.parent != null) hgrTo = hgrTo.parent!!
-        adapter.performReorder(from, to)
-        behavior.onReorderHabitGroup(hgrFrom, hgrTo)
+        if (habitFrom != null) {
+            if (habitFrom.isSubHabit()) {
+                if (habitTo != null && habitTo.isSubHabit()) {
+                    if (habitFrom.group == habitTo.group) {
+                        adapter.performReorder(from, to)
+                        behavior.onReorderHabit(habitFrom, habitTo)
+                        return true
+                    } else {
+                        val targetGroup = habitTo.group ?: return false
+                        behavior.onAddHabitToGroup(habitFrom, targetGroup)
+                        return false
+                    }
+                } else if (groupTo != null) {
+                    behavior.onAddHabitToGroup(habitFrom, groupTo)
+                    return false
+                } else if (habitTo != null && !habitTo.isSubHabit()) {
+                    behavior.onRemoveHabitFromGroup(habitFrom)
+                    return false
+                }
+            } else {
+                if (groupTo != null) {
+                    behavior.onAddHabitToGroup(habitFrom, groupTo)
+                    return false
+                } else if (habitTo != null && habitTo.isSubHabit()) {
+                    val targetGroup = habitTo.group ?: return false
+                    behavior.onAddHabitToGroup(habitFrom, targetGroup)
+                    return false
+                } else {
+                    adapter.performReorder(from, to)
+                    behavior.onReorderTopLevelItems(adapter.getTopLevelItems())
+                    return true
+                }
+            }
+        } else {
+            adapter.performReorder(from, to)
+            behavior.onReorderTopLevelItems(adapter.getTopLevelItems())
+            return true
+        }
+        return false
     }
 
     override fun onItemClick(position: Int) {

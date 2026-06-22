@@ -19,3 +19,8 @@ node_modules
 crowdin.yml
 kotlin-js-store
 *.md
+jdk17/
+android-sdk/
+cmdline-tools.zip
+jdk17.tar.gz
+jdk17_download.tar.gz

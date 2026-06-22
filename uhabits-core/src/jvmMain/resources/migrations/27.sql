@@ -1,0 +1,1 @@
+ALTER TABLE habitgroups ADD COLUMN collapsed INTEGER DEFAULT 0;

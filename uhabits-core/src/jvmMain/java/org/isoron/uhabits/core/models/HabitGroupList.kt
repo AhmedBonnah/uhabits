@@ -217,5 +217,6 @@ abstract class HabitGroupList : Iterable<HabitGroup> {
         csv.close()
     }
 
+    open fun reload() {}
     abstract fun resort()
 }

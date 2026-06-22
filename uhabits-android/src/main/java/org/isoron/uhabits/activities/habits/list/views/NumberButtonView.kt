@@ -175,6 +175,7 @@ class NumberButtonView(
 
         fun draw(canvas: Canvas) {
             val activeColor = when {
+                value == Entry.SKIP.toDouble() / 1000 -> sres.getColor(R.attr.yellowColor)
                 value < 0.0 -> lowContrast
                 (targetType == AT_LEAST) && (value >= threshold) -> color
                 (targetType == AT_MOST) && (value <= threshold) -> color
@@ -187,7 +188,7 @@ class NumberButtonView(
 
             when {
                 value == Entry.SKIP.toDouble() / 1000 -> {
-                    label = resources.getString(R.string.fa_skipped)
+                    label = resources.getString(R.string.fa_check)
                     textSize = dim(R.dimen.smallTextSize)
                     typeface = getFontAwesome()
                 }

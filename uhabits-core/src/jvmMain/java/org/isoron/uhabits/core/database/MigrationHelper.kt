@@ -44,7 +44,7 @@ class MigrationHelper(
         // Workaround for bug in Android Studio / IntelliJ. Removing this
         // causes unit tests to fail when run from within the IDE, although
         // everything works fine from the command line.
-        val file = File("uhabits-core/src/main/resources/$fname")
+        val file = File("uhabits-core/src/jvmMain/resources/$fname")
         if (file.exists()) return FileInputStream(file)
         throw RuntimeException("resource not found: $fname")
     }

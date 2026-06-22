@@ -139,7 +139,9 @@ class EditHabitGroupActivity : AppCompatActivity() {
         }
 
         for (fragment in supportFragmentManager.fragments) {
-            (fragment as DialogFragment).dismiss()
+            if (fragment is DialogFragment) {
+                fragment.dismiss()
+            }
         }
     }
 

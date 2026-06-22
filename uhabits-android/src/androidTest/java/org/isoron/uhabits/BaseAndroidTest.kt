@@ -29,11 +29,11 @@ import androidx.test.uiautomator.UiDevice
 import junit.framework.TestCase
 import org.hamcrest.CoreMatchers.hasItems
 import org.hamcrest.MatcherAssert.assertThat
-import org.isoron.uhabits.core.models.HabitGroupList
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.computeToday
 import org.isoron.platform.time.getToday
 import org.isoron.platform.time.setToday
+import org.isoron.uhabits.core.models.HabitGroupList
 import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.models.ModelFactory
 import org.isoron.uhabits.core.preferences.Preferences

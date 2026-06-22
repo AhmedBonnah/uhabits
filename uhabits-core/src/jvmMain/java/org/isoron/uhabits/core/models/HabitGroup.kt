@@ -55,9 +55,6 @@ data class HabitGroup(
         set(value) {
             if (field == value) return
             field = value
-            habitList.collapsed = value
-            if (parent != null) parent!!.collapsed = value
-
             observable.notifyListeners()
         }
 

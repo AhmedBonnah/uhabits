@@ -145,7 +145,8 @@ class CheckmarkButtonView(
 
         fun draw(canvas: Canvas) {
             paint.color = when (value) {
-                YES_MANUAL, YES_AUTO, SKIP -> color
+                YES_MANUAL, YES_AUTO -> color
+                SKIP -> sres.getColor(R.color.yellow_500)
                 NO -> {
                     if (preferences.areQuestionMarksEnabled) {
                         mediumContrastColor
@@ -156,7 +157,7 @@ class CheckmarkButtonView(
                 else -> lowContrastColor
             }
             val id = when (value) {
-                SKIP -> R.string.fa_skipped
+                SKIP -> R.string.fa_check
                 NO -> R.string.fa_times
                 UNKNOWN -> {
                     if (preferences.areQuestionMarksEnabled) {

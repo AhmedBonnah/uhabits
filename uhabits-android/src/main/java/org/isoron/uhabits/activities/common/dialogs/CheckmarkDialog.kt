@@ -50,9 +50,9 @@ class CheckmarkDialog : AppCompatDialogFragment() {
         val prefs = appComponent.preferences
         view = CheckmarkPopupBinding.inflate(LayoutInflater.from(context))
         val color = requireArguments().getInt("color")
-        arrayOf(view.yesBtn, view.skipBtn).forEach {
-            it.setTextColor(color)
-        }
+        view.yesBtn.setTextColor(color)
+        view.skipBtn.setTextColor(view.root.sres.getColor(R.attr.yellowColor))
+        view.skipBtn.setText(R.string.fa_check)
         arrayOf(view.noBtn, view.unknownBtn).forEach {
             it.setTextColor(view.root.sres.getColor(R.attr.contrast60))
         }

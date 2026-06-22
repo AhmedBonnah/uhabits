@@ -21,6 +21,7 @@ package org.isoron.uhabits.core.models.sqlite
 import me.tatarka.inject.annotations.Inject
 import org.isoron.uhabits.core.database.Repository
 import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.HabitGroup
 import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.models.HabitMatcher
 import org.isoron.uhabits.core.models.ModelFactory
@@ -55,6 +56,7 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
             list.add(h)
             expectedPosition++
         }
+        for (h in list) h.recompute()
         if (shouldRebuildOrder) rebuildOrder()
     }
 
@@ -155,12 +157,6 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
         set(order) {
             list.secondaryOrder = order
             observable.notifyListeners()
-        }
-
-    override var collapsed: Boolean = list.collapsed
-        set(value) {
-            field = value
-            list.collapsed = value
         }
 
     @Synchronized
@@ -269,13 +265,55 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
         observable.notifyListeners()
     }
 
+    @Synchronized
+    override fun move(habit: Habit, target: HabitList) {
+        if (target !is SQLiteHabitList) {
+            super.move(habit, target)
+            return
+        }
+
+        loadRecords()
+        target.loadRecords()
+
+        val record = repository.find(habit.id!!) ?: throw RuntimeException("habit not in database")
+
+        record.groupId = target.groupId
+        record.groupUUID = if (target.groupId != null) habit.groupUUID else null
+        record.position = target.size()
+        repository.save(record)
+
+        this.reload()
+        target.reload()
+
+        this.observable.notifyListeners()
+        target.observable.notifyListeners()
+    }
+
+    @Synchronized
+    override fun reorderTopLevelItems(items: List<Any>) {
+        repository.executeAsTransaction {
+            for ((index, item) in items.withIndex()) {
+                if (item is Habit) {
+                    val habitRecord = repository.find(item.id!!)
+                    if (habitRecord != null) {
+                        habitRecord.position = index
+                        repository.save(habitRecord)
+                    }
+                } else if (item is HabitGroup) {
+                    repository.execSQL("update habitgroups set position = ? where id = ?", index, item.id!!)
+                }
+            }
+        }
+        observable.notifyListeners()
+    }
+
     override fun resort() {
         list.resort()
         observable.notifyListeners()
     }
 
     @Synchronized
-    fun reload() {
+    override fun reload() {
         loaded = false
     }
 }

@@ -46,6 +46,7 @@ import org.isoron.uhabits.core.commands.CreateHabitCommand
 import org.isoron.uhabits.core.commands.EditHabitCommand
 import org.isoron.uhabits.core.commands.RefreshParentGroupCommand
 import org.isoron.uhabits.core.models.Frequency
+import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitGroup
 import org.isoron.uhabits.core.models.HabitType
 import org.isoron.uhabits.core.models.NumericalHabitType
@@ -109,12 +110,9 @@ class EditHabitActivity : AppCompatActivity() {
         if (intent.hasExtra("habitId")) {
             binding.toolbar.title = getString(R.string.edit_habit)
             habitId = intent.getLongExtra("habitId", -1L)
-            val habitList = if (parentGroup != null) {
-                parentGroup!!.habitList
-            } else {
-                component.habitList
-            }
-            val habit = habitList.getById(habitId)!!
+            val habit = component.habitList.getById(habitId)
+                ?: component.habitGroupList.getHabitByID(habitId)!!
+            parentGroup = habit.group
             habitType = habit.type
             color = habit.color
             freqNum = habit.frequency.numerator
@@ -143,6 +141,10 @@ class EditHabitActivity : AppCompatActivity() {
             reminderHour = state.getInt("reminderHour")
             reminderMin = state.getInt("reminderMin")
             reminderDays = WeekdayList(state.getInt("reminderDays"))
+            val parentGroupId = state.getLong("parentGroupId", -1L)
+            if (parentGroupId != -1L) {
+                parentGroup = component.habitGroupList.getById(parentGroupId)
+            }
         }
 
         updateColors()
@@ -223,6 +225,25 @@ class EditHabitActivity : AppCompatActivity() {
         }
 
         populateReminder()
+        populateGroup()
+        binding.groupPicker.setOnClickListener {
+            val activeGroups = component.habitGroupList.filter { !it.isArchived }
+            val options = mutableListOf<String>()
+            options.add(getString(R.string.no_group))
+            options.addAll(activeGroups.map { it.name })
+
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(R.string.group)
+                .setItems(options.toTypedArray()) { _, which ->
+                    parentGroup = if (which == 0) {
+                        null
+                    } else {
+                        activeGroups[which - 1]
+                    }
+                    populateGroup()
+                }
+                .show()
+        }
         binding.reminderTimePicker.setOnClickListener {
             val currentHour = if (reminderHour >= 0) reminderHour else 8
             val currentMin = if (reminderMin >= 0) reminderMin else 0
@@ -267,7 +288,9 @@ class EditHabitActivity : AppCompatActivity() {
         }
 
         for (fragment in supportFragmentManager.fragments) {
-            (fragment as DialogFragment).dismiss()
+            if (fragment is DialogFragment) {
+                fragment.dismiss()
+            }
         }
     }
 
@@ -275,16 +298,20 @@ class EditHabitActivity : AppCompatActivity() {
         val component = (application as HabitsApplication).component
         val habit = component.modelFactory.buildHabit()
 
-        val habitList = if (parentGroup != null) {
-            parentGroup!!.habitList
-        } else {
-            component.habitList
-        }
-
+        var original: Habit? = null
         if (habitId > 0) {
-            val original = habitList.getById(habitId)!!
+            original = component.habitList.getById(habitId)
+                ?: component.habitGroupList.getHabitByID(habitId)!!
             habit.copyFrom(original)
         }
+
+        if (habitId > 0 && parentGroup != original?.group) {
+            val oldList = original?.group?.habitList ?: component.habitList
+            val newList = parentGroup?.habitList ?: component.habitList
+            oldList.move(original!!, newList)
+        }
+
+        val habitList = parentGroup?.habitList ?: component.habitList
 
         habit.name = binding.nameInput.text.trim().toString()
         habit.question = binding.questionInput.text.trim().toString()
@@ -392,6 +419,10 @@ class EditHabitActivity : AppCompatActivity() {
         return Html.fromHtml(html)
     }
 
+    private fun populateGroup() {
+        binding.groupPicker.text = parentGroup?.name ?: getString(R.string.no_group)
+    }
+
     override fun onSaveInstanceState(state: Bundle) {
         super.onSaveInstanceState(state)
         with(state) {
@@ -404,6 +435,7 @@ class EditHabitActivity : AppCompatActivity() {
             putInt("reminderHour", reminderHour)
             putInt("reminderMin", reminderMin)
             putInt("reminderDays", reminderDays.toInteger())
+            parentGroup?.id?.let { putLong("parentGroupId", it) }
         }
     }
 }

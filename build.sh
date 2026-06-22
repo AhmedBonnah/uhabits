@@ -17,6 +17,22 @@
 
 cd "$(dirname "$0")" || exit
 
+if [ -z "$ANDROID_HOME" ] || [ ! -f "${ANDROID_HOME}/platform-tools/adb" ]; then
+    LOCAL_SDK="$(pwd)/android-sdk"
+    if [ -f "${LOCAL_SDK}/platform-tools/adb" ]; then
+        export ANDROID_HOME="${LOCAL_SDK}"
+    fi
+fi
+
+if [ -z "$JAVA_HOME" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
+    LOCAL_JDK="$(pwd)/jdk17"
+    if [ -x "${LOCAL_JDK}/bin/java" ]; then
+        export JAVA_HOME="${LOCAL_JDK}"
+        export PATH="${JAVA_HOME}/bin:${PATH}"
+    fi
+fi
+
+
 ADB="${ANDROID_HOME}/platform-tools/adb"
 ANDROID_OUTPUTS_DIR="uhabits-android/build/outputs"
 AVDMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/avdmanager"
