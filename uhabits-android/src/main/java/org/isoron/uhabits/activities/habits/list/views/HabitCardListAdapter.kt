@@ -46,6 +46,7 @@ class HabitCardListAdapter(
     private var listView: HabitCardListView? = null
     val selectedHabits: LinkedList<Habit> = LinkedList()
     val selectedHabitGroups: LinkedList<HabitGroup> = LinkedList()
+    private var lastSortable = false
 
     override fun atMidnight() {
         cache.refreshAllHabits()
@@ -120,11 +121,13 @@ class HabitCardListAdapter(
             val notes = item.notes
             val selected = selectedHabits.contains(habit)
             listView!!.bindCardView(holder, habit, score, checkmarks, notes, selected)
+            (holder.itemView as HabitCardView).showDragHandle(isSortable)
         } else if (item is HabitListItem.GroupItem) {
             val habitGroup = item.group
             val score = cache.getScore(habitGroup.id!!)
             val selected = selectedHabitGroups.contains(habitGroup)
             listView!!.bindGroupCardView(holder, habitGroup, score, selected)
+            (holder.itemView as HabitGroupCardView).showDragHandle(isSortable)
         }
     }
 
@@ -156,6 +159,11 @@ class HabitCardListAdapter(
     }
 
     override fun onListUpdated(newList: List<HabitListItem>) {
+        val currentSortable = isSortable
+        if (currentSortable != lastSortable) {
+            lastSortable = currentSortable
+            notifyDataSetChanged()
+        }
         submitList(newList) {
             observable.notifyListeners()
         }

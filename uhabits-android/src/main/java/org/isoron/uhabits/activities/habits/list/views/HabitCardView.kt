@@ -67,6 +67,8 @@ class HabitCardView(
 ) : FrameLayout(context),
     ModelObservable.Listener {
 
+    val dragHandleView: android.widget.ImageView
+
     var buttonCount
         get() = checkmarkPanel.buttonCount
         set(value) {
@@ -133,6 +135,15 @@ class HabitCardView(
     private var currentToggleTaskId = 0
 
     init {
+        dragHandleView = android.widget.ImageView(context).apply {
+            setImageResource(R.drawable.ic_drag_handle)
+            val iconSize = dp(24f).toInt()
+            layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                marginEnd = dp(8f).toInt()
+            }
+            visibility = GONE
+        }
+
         scoreRing = RingView(context).apply {
             val thickness = dp(3f)
             val margin = dp(8f).toInt()
@@ -195,6 +206,7 @@ class HabitCardView(
             // Increase elevation slightly for floating look
             elevation = dp(4f)
 
+            addView(dragHandleView)
             addView(scoreRing)
             addView(label)
             addView(checkmarkPanel)
@@ -220,6 +232,10 @@ class HabitCardView(
     override fun setSelected(isSelected: Boolean) {
         super.setSelected(isSelected)
         updateBackground(isSelected)
+    }
+
+    fun showDragHandle(show: Boolean) {
+        dragHandleView.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     fun triggerRipple(date: LocalDate) {

@@ -56,6 +56,7 @@ class HabitGroupCardView(
             scoreRing.setPrecision(1.0f / 16)
         }
 
+    val dragHandleView: android.widget.ImageView
     var addButtonView: AddButtonView
     var collapseButtonView: CollapseButtonView
     private var innerFrame: LinearLayout
@@ -66,6 +67,15 @@ class HabitGroupCardView(
     private var currentToggleTaskId = 0
 
     init {
+        dragHandleView = android.widget.ImageView(context).apply {
+            setImageResource(R.drawable.ic_drag_handle)
+            val iconSize = dp(24f).toInt()
+            layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                marginEnd = dp(8f).toInt()
+            }
+            visibility = GONE
+        }
+
         scoreRing = RingView(context).apply {
             val thickness = dp(3f)
             val margin = dp(8f).toInt()
@@ -111,6 +121,7 @@ class HabitGroupCardView(
             // Increase elevation slightly for floating look
             elevation = dp(4f)
 
+            addView(dragHandleView)
             addView(scoreRing)
             addView(groupIndicator)
             addView(label)
@@ -137,6 +148,10 @@ class HabitGroupCardView(
     override fun setSelected(isSelected: Boolean) {
         super.setSelected(isSelected)
         updateBackground(isSelected)
+    }
+
+    fun showDragHandle(show: Boolean) {
+        dragHandleView.visibility = if (show) android.view.View.VISIBLE else android.view.View.GONE
     }
 
     override fun onAttachedToWindow() {

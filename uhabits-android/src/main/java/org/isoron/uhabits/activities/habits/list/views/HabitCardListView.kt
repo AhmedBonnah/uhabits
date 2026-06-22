@@ -143,6 +143,13 @@ class HabitCardListView(
             true
         }
 
+        cardView.dragHandleView.setOnTouchListener { _, ev ->
+            if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
+                touchHelper.startDrag(holder)
+            }
+            true
+        }
+
         return cardView
     }
 
@@ -160,6 +167,13 @@ class HabitCardListView(
         val detector = GestureDetector(context, CardViewGestureDetector(holder))
         cardView.setOnTouchListener { _, ev ->
             detector.onTouchEvent(ev)
+            true
+        }
+
+        cardView.dragHandleView.setOnTouchListener { _, ev ->
+            if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
+                touchHelper.startDrag(holder)
+            }
             true
         }
 
@@ -216,7 +230,6 @@ class HabitCardListView(
         override fun onLongPress(e: MotionEvent) {
             val position = holder.adapterPosition
             controller.value.onItemLongClick(position)
-            if (adapter.isSortable) touchHelper.startDrag(holder)
         }
 
         override fun onSingleTapUp(e: MotionEvent): Boolean {
