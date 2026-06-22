@@ -175,7 +175,7 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
         list.remove(h)
         val record = repository.find(
             h.id!!
-        ) ?: throw RuntimeException("habit not in database")
+        ) ?: return
         repository.executeAsTransaction {
             h.originalEntries.clear()
             repository.remove(record)

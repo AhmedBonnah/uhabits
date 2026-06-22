@@ -30,9 +30,11 @@ data class DeleteHabitsCommand(
 ) : Command {
     override fun run() {
         for (h in selected) {
-            if (!h.isSubHabit()) {
-                habitList.remove(h)
-            } else {
+            // ALWAYS remove from the master habitList to ensure database deletion
+            habitList.remove(h)
+
+            // Additionally remove from the group's memory list to update the UI
+            if (h.isSubHabit()) {
                 val group = h.group as HabitGroup
                 val originalGroup = group.parent ?: group
 
