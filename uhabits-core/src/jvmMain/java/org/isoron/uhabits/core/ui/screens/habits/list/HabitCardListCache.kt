@@ -151,20 +151,18 @@ class HabitCardListCache(
                     val p2 = if (o2 is Habit) o2.position else (o2 as HabitGroup).position
                     if (p1 != p2) return@Comparator p1.compareTo(p2)
                 }
-                if (o1.javaClass != o2.javaClass) {
-                    if (o1 is HabitGroup) -1 else 1
+                if (o1 is Habit && o2 is Habit) {
+                    val idx1 = habitIndices[(o1 as Habit).id] ?: 0
+                    val idx2 = habitIndices[(o2 as Habit).id] ?: 0
+                    idx1.compareTo(idx2)
+                } else if (o1 is HabitGroup && o2 is HabitGroup) {
+                    val idx1 = groupIndices[(o1 as HabitGroup).id] ?: 0
+                    val idx2 = groupIndices[(o2 as HabitGroup).id] ?: 0
+                    idx1.compareTo(idx2)
                 } else {
-                    if (o1 is Habit && o2 is Habit) {
-                        val idx1 = habitIndices[(o1 as Habit).id] ?: 0
-                        val idx2 = habitIndices[(o2 as Habit).id] ?: 0
-                        idx1.compareTo(idx2)
-                    } else if (o1 is HabitGroup && o2 is HabitGroup) {
-                        val idx1 = groupIndices[(o1 as HabitGroup).id] ?: 0
-                        val idx2 = groupIndices[(o2 as HabitGroup).id] ?: 0
-                        idx1.compareTo(idx2)
-                    } else {
-                        0
-                    }
+                    val id1 = if (o1 is Habit) (o1 as Habit).id else (o1 as HabitGroup).id
+                    val id2 = if (o2 is Habit) (o2 as Habit).id else (o2 as HabitGroup).id
+                    (id1 ?: 0).compareTo(id2 ?: 0)
                 }
             }
         )

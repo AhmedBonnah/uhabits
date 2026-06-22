@@ -59,84 +59,34 @@ class HabitGroupCardView(
     val dragHandleView: android.widget.ImageView
     var addButtonView: AddButtonView
     var collapseButtonView: CollapseButtonView
-    private var innerFrame: LinearLayout
+    private var innerFrame: android.view.View
     private var label: TextView
     private var scoreRing: RingView
-    private var groupIndicator: TextView
+    private var groupIndicator: android.widget.ImageView
 
     private var currentToggleTaskId = 0
 
     init {
-        dragHandleView = android.widget.ImageView(context).apply {
-            setImageResource(R.drawable.ic_drag_handle)
-            val iconSize = dp(24f).toInt()
-            layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
-                marginEnd = dp(8f).toInt()
-            }
-            visibility = GONE
-        }
+        android.view.LayoutInflater.from(context).inflate(R.layout.item_habit_group_card, this, true)
 
-        scoreRing = RingView(context).apply {
-            val thickness = dp(3f)
-            val margin = dp(8f).toInt()
-            val ringSize = dp(15f).toInt()
-            layoutParams = LinearLayout.LayoutParams(ringSize, ringSize).apply {
-                setMargins(margin, 0, margin, 0)
-                gravity = Gravity.CENTER
-            }
-            setThickness(thickness)
-        }
+        dragHandleView = findViewById(R.id.drag_handle)
+        scoreRing = findViewById(R.id.score_ring)
+        groupIndicator = findViewById(R.id.group_icon)
+        label = findViewById(R.id.group_label)
+        addButtonView = findViewById(R.id.add_button)
+        collapseButtonView = findViewById(R.id.collapse_button)
 
-        groupIndicator = TextView(context).apply {
-            text = "G"
-            textSize = 12f
-            setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setMargins(0, 0, dp(4f).toInt(), 0)
-            }
-        }
+        addButtonView.habitGroup = habitGroup
+        collapseButtonView.habitGroup = habitGroup
 
-        label = TextView(context).apply {
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
-            layoutParams = LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
-            if (SDK_INT >= Build.VERSION_CODES.Q) {
-                breakStrategy = BREAK_STRATEGY_BALANCED
-            }
-            setTypeface(typeface, Typeface.BOLD)
-        }
-
-        addButtonView = AddButtonView(context, habitGroup)
-        collapseButtonView = CollapseButtonView(context, habitGroup)
-
-        innerFrame = LinearLayout(context).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            val marginH = dp(8f).toInt()
-            val marginV = dp(6f).toInt()
-            layoutParams = LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                setMargins(marginH, marginV, marginH, marginV)
-            }
-            // Increase elevation slightly for floating look
-            elevation = dp(4f)
-
-            addView(dragHandleView)
-            addView(scoreRing)
-            addView(groupIndicator)
-            addView(label)
-            addView(addButtonView)
-            addView(collapseButtonView)
-
-            setOnTouchListener { v, event ->
-                v.background.setHotspot(event.x, event.y)
-                false
-            }
+        innerFrame = getChildAt(0)
+        innerFrame.setOnTouchListener { v, event ->
+            v.background?.setHotspot(event.x, event.y)
+            false
         }
 
         clipToPadding = false
         layoutParams = LayoutParams(MATCH_PARENT, WRAP_CONTENT)
-        addView(innerFrame)
     }
 
     override fun onModelChange() {
@@ -183,7 +133,7 @@ class HabitGroupCardView(
             setTextColor(c)
         }
         groupIndicator.apply {
-            setTextColor(c)
+            setColorFilter(c)
         }
         scoreRing.apply {
             setColor(c)

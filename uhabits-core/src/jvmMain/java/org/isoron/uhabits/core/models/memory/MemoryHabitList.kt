@@ -214,11 +214,13 @@ class MemoryHabitList : HabitList {
     override fun reorder(from: Habit, to: Habit) {
         throwIfHasParent()
         check(!(primaryOrder !== Order.BY_POSITION)) { "cannot reorder automatically sorted list" }
-        require(indexOf(from) >= 0) { "list does not contain (from) habit" }
-        val toPos = indexOf(to)
+        val actualFrom = if (from.id != null) getById(from.id!!) ?: from else from
+        val actualTo = if (to.id != null) getById(to.id!!) ?: to else to
+        require(indexOf(actualFrom) >= 0) { "list does not contain (from) habit" }
+        val toPos = indexOf(actualTo)
         require(toPos >= 0) { "list does not contain (to) habit" }
-        list.remove(from)
-        list.add(toPos, from)
+        list.remove(actualFrom)
+        list.add(toPos, actualFrom)
         var position = list.minOfOrNull { it.position } ?: 0
         for (h in list) h.position = position++
         observable.notifyListeners()
