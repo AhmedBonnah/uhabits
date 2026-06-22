@@ -35,6 +35,7 @@ abstract class HabitList : Iterable<Habit> {
     protected val filter: HabitMatcher
 
     var groupId: Long? = null
+    var groupUUID: String? = null
 
     /**
      * Creates a new HabitList.

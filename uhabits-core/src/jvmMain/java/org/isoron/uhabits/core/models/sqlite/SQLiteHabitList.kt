@@ -34,36 +34,34 @@ import org.isoron.uhabits.core.models.sqlite.records.HabitRecord
 @Inject
 class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
     private val repository: Repository<HabitRecord> = modelFactory.buildHabitListRepository()
-    private val list: MemoryHabitList = MemoryHabitList()
+    private val list: MemoryHabitList = MemoryHabitList().apply {
+        unfilteredRoot = this@SQLiteHabitList
+    }
     private var loaded = false
     private fun loadRecords() {
         if (loaded) return
         loaded = true
         list.groupId = this.groupId
+        list.groupUUID = this.groupUUID
         list.removeAll()
 
         val whereClause = if (this.groupId == null) "where group_id is null" else "where group_id = ?"
         val params = if (this.groupId == null) emptyArray<String>() else arrayOf(this.groupId.toString())
         val records = repository.findAll("$whereClause order by position", *params)
 
-        var shouldRebuildOrder = false
-        var expectedPosition = 0
         for (rec in records) {
-            if (rec.position != expectedPosition) shouldRebuildOrder = true
             val h = modelFactory.buildHabit()
             rec.copyTo(h)
             (h.originalEntries as SQLiteEntryList).habitId = h.id
             list.add(h)
-            expectedPosition++
         }
         for (h in list) h.recompute()
-        if (shouldRebuildOrder) rebuildOrder()
     }
 
     @Synchronized
     override fun add(habit: Habit) {
         loadRecords()
-        habit.position = size()
+        habit.position = (list.maxOfOrNull { it.position } ?: -1) + 1
         habit.id = repository.getNextAvailableId("habitandgroup")
         val record = HabitRecord()
         record.copyFrom(habit)
@@ -208,7 +206,10 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
     @Synchronized
     override fun reorder(from: Habit, to: Habit) {
         loadRecords()
-        list.reorder(from, to)
+
+        val actualFrom = list.getById(from.id!!) ?: from
+        val actualTo = list.getById(to.id!!) ?: to
+        list.reorder(actualFrom, actualTo)
 
         repository.executeAsTransaction {
             val fromRecord = repository.find(from.id!!)
@@ -262,6 +263,7 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
             record.copyFrom(h)
             repository.save(record)
         }
+        loaded = false
         observable.notifyListeners()
     }
 
@@ -279,7 +281,7 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
         val record = repository.find(habit.id!!) ?: throw RuntimeException("habit not in database")
 
         record.groupId = targetGroupId
-        record.groupUUID = if (targetGroupId != null) habit.groupUUID else null
+        record.groupUUID = target.groupUUID
         record.position = target.size()
         repository.save(record)
 

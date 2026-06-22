@@ -127,19 +127,25 @@ open class ListHabitsBehavior(
     fun onReorderHabit(from: Habit, to: Habit) {
         if (from.group == to.group) {
             val list = from.group?.habitList ?: habitList
-            taskRunner.execute { list.reorder(from, to) }
+            taskRunner.execute { list.unfiltered.reorder(from, to) }
         }
     }
 
     fun onReorderHabitGroup(from: HabitGroup, to: HabitGroup) {
-        taskRunner.execute { habitGroupList.reorder(from, to) }
+        taskRunner.execute { habitGroupList.unfiltered.reorder(from, to) }
     }
 
     fun onReorderTopLevelItems(items: List<Any>) {
         taskRunner.execute {
-            habitList.reorderTopLevelItems(items)
+            habitList.unfiltered.reorderTopLevelItems(items)
             habitList.reload()
             habitGroupList.reload()
+        }
+    }
+
+    fun onToggleHabitGroupCollapse(habitGroup: HabitGroup) {
+        taskRunner.execute {
+            habitGroupList.update(listOf(habitGroup))
         }
     }
 

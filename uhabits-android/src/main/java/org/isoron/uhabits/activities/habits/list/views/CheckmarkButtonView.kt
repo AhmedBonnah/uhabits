@@ -146,7 +146,7 @@ class CheckmarkButtonView(
         fun draw(canvas: Canvas) {
             paint.color = when (value) {
                 YES_MANUAL, YES_AUTO -> color
-                SKIP -> sres.getColor(R.color.yellow_500)
+                SKIP -> sres.getColor(R.attr.yellowColor)
                 NO -> {
                     if (preferences.areQuestionMarksEnabled) {
                         mediumContrastColor

@@ -57,6 +57,14 @@ abstract class HabitGroupList : Iterable<HabitGroup> {
     abstract fun getById(id: Long): HabitGroup?
 
     /**
+     * Returns the parent list if this is a filtered list, or itself otherwise.
+     * Use this when modifying the list (e.g. adding or moving habits) because
+     * filtered lists cannot be modified directly.
+     */
+    open val unfiltered: HabitGroupList
+        get() = this
+
+    /**
      * Returns the habit group with specified UUID.
      *
      * @param uuid the UUID of the habit group

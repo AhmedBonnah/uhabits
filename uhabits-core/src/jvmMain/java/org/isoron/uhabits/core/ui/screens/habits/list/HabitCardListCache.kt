@@ -1,21 +1,3 @@
-/*
- * Copyright (C) 2016-2025 Álinson Santos Xavier <git@axavier.org>
- *
- * This file is part of Loop Habit Tracker.
- *
- * Loop Habit Tracker is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or (at your
- * option) any later version.
- *
- * Loop Habit Tracker is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
 package org.isoron.uhabits.core.ui.screens.habits.list
 
 import me.tatarka.inject.annotations.Inject
@@ -23,899 +5,269 @@ import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.AppScope
 import org.isoron.uhabits.core.commands.Command
 import org.isoron.uhabits.core.commands.CommandRunner
-import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.io.Logging
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitGroup
 import org.isoron.uhabits.core.models.HabitGroupList
 import org.isoron.uhabits.core.models.HabitList
-import org.isoron.uhabits.core.models.HabitList.Order
 import org.isoron.uhabits.core.models.HabitMatcher
+import org.isoron.uhabits.core.models.ModelObservable
 import org.isoron.uhabits.core.tasks.Task
 import org.isoron.uhabits.core.tasks.TaskRunner
 
-/**
- * A HabitCardListCache fetches and keeps a cache of all the data necessary to
- * render a HabitCardListView.
- *
- *
- * This is needed since performing database lookups during scrolling can make
- * the ListView very slow. It also registers itself as an observer of the
- * models, in order to update itself automatically.
- *
- *
- * Note that this class is singleton-scoped, therefore it is shared among all
- * activities.
- */
 @AppScope
 @Inject
 class HabitCardListCache(
     private val habits: HabitList,
     private val habitGroups: HabitGroupList,
     private val commandRunner: CommandRunner,
-    taskRunner: TaskRunner,
+    private val taskRunner: TaskRunner,
     logging: Logging
-) : CommandRunner.Listener {
+) : CommandRunner.Listener, ModelObservable.Listener {
 
     private val logger = logging.getLogger("HabitCardListCache")
 
-    private var checkmarkCount = 0
-    private var currentFetchTask: Task? = null
-    private var listener: Listener
-    private val data: CacheData
-    private var filteredHabits: HabitList
-    private var filteredHabitGroups: HabitGroupList
-    private val taskRunner: TaskRunner
-
-    @Synchronized
-    fun cancelTasks() {
-        currentFetchTask?.cancel()
+    interface Listener {
+        fun onListUpdated(newList: List<HabitListItem>)
+        fun onRefreshFinished()
     }
 
-    @Synchronized
-    fun getCheckmarks(habitID: Long): IntArray {
-        return data.checkmarks[habitID]!!
-    }
+    private var listener: Listener? = null
+    private var checkmarkCount = 7
+    private var isAttached = false
+    private var filter: HabitMatcher? = null
 
-    @Synchronized
-    fun getNotes(habitID: Long): Array<String> {
-        return data.notes[habitID]!!
-    }
+    @Volatile
+    private var currentList: List<HabitListItem> = emptyList()
 
-    @Synchronized
-    fun hasNoHabit(): Boolean {
-        return habits.isEmpty
-    }
-
-    @Synchronized
-    fun hasNoHabitGroup(): Boolean {
-        return habitGroups.isEmpty
-    }
-
-    @Synchronized
-    fun hasNoSubHabits(): Boolean {
-        return habitGroups.all { it.habitList.isEmpty }
-    }
-
-    /**
-     * Returns the habits that occupies a certain position on the list.
-     *
-     * @param position the position of the list of habits and groups
-     * @return the habit at given position or null if position is invalid
-     */
-    @Synchronized
-    fun getHabitByPosition(position: Int): Habit? {
-        return data.positionToHabit[position]
-    }
-
-    /**
-     * Returns the habit groups that occupies a certain position on the list.
-     *
-     * @param position the position of the list of habits and groups
-     * @return the habit group at given position or null if position is invalid
-     */
-    @Synchronized
-    fun getHabitGroupByPosition(position: Int): HabitGroup? {
-        return data.positionToHabitGroup[position]
-    }
-
-    @Synchronized
-    fun getIdByPosition(position: Int): Long? {
-        return if (data.positionTypes[position] == STANDALONE_HABIT || data.positionTypes[position] == SUB_HABIT) {
-            data.positionToHabit[position]!!.id
-        } else {
-            data.positionToHabitGroup[position]!!.id
-        }
-    }
-
-    @get:Synchronized
-    val itemCount: Int
-        get() = data.positionTypes.size
-
-    @get:Synchronized
-    val habitCount: Int
-        get() = data.habits.size
-
-    @get:Synchronized
-    val habitGroupCount: Int
-        get() = data.habitGroups.size
-
-    @get:Synchronized
-    val subHabitCount: Int
-        get() = data.subHabits.sumOf { it.size }
-
-    @get:Synchronized
-    @set:Synchronized
-    var primaryOrder: Order
-        get() = filteredHabits.primaryOrder
-        set(order) {
-            habits.primaryOrder = order
-            habitGroups.primaryOrder = order
-            filteredHabits.primaryOrder = order
-            filteredHabitGroups.primaryOrder = order
+    var primaryOrder: HabitList.Order = HabitList.Order.BY_POSITION
+        set(value) {
+            field = value
             refreshAllHabits()
         }
 
-    @get:Synchronized
-    @set:Synchronized
-    var secondaryOrder: Order
-        get() = filteredHabits.secondaryOrder
-        set(order) {
-            habits.secondaryOrder = order
-            habitGroups.secondaryOrder = order
-            filteredHabits.secondaryOrder = order
-            filteredHabitGroups.secondaryOrder = order
+    var secondaryOrder: HabitList.Order = HabitList.Order.BY_SCORE_DESC
+        set(value) {
+            field = value
             refreshAllHabits()
         }
 
-    @Synchronized
-    fun getScore(id: Long): Double {
-        return data.scores[id]!!
-    }
+    val itemCount: Int get() = currentList.size
+    val habitCount: Int get() = currentList.count { it is HabitListItem.HabitCardItem && it.habit.groupId == null }
+    val habitGroupCount: Int get() = currentList.count { it is HabitListItem.GroupItem }
+    val subHabitCount: Int get() = currentList.count { it is HabitListItem.HabitCardItem && it.habit.groupId != null }
 
-    @Synchronized
+    fun hasNoHabit() = habitCount == 0
+    fun hasNoHabitGroup() = habitGroupCount == 0
+
+    fun setListener(l: Listener?) { listener = l }
+    fun setCheckmarkCount(count: Int) { checkmarkCount = count }
+
     fun onAttached() {
-        refreshAllHabits()
+        if (isAttached) return
+        isAttached = true
+        habits.observable.addListener(this)
+        habitGroups.observable.addListener(this)
         commandRunner.addListener(this)
+        refreshAllHabits()
     }
 
-    @Synchronized
-    override fun onCommandFinished(command: Command) {
-        if (command is CreateRepetitionCommand) {
-            command.habit.id?.let { refreshHabit(it) }
-        } else {
-            refreshAllHabits()
-        }
-    }
-
-    @Synchronized
     fun onDetached() {
+        isAttached = false
+        habits.observable.removeListener(this)
+        habitGroups.observable.removeListener(this)
         commandRunner.removeListener(this)
+        cancelTasks()
     }
+
+    override fun onModelChange() {
+        refreshAllHabits()
+    }
+
+    override fun onCommandFinished(command: Command) {
+        refreshAllHabits()
+    }
+
+    fun setFilter(matcher: HabitMatcher) {
+        filter = matcher
+        refreshAllHabits()
+    }
+
+    private var currentTask: Task? = null
 
     @Synchronized
     fun refreshAllHabits() {
-        if (currentFetchTask != null) currentFetchTask!!.cancel()
-        val task = RefreshTask()
-        currentFetchTask = task
+        if (!isAttached) return
+
+        val task = object : Task {
+            private var isCancelled = false
+            private var newList: List<HabitListItem> = emptyList()
+
+            override fun cancel() {
+                isCancelled = true
+            }
+
+            override fun doInBackground() {
+                newList = buildList()
+            }
+
+            override fun onPostExecute() {
+                if (isCancelled) return
+                currentList = newList
+                listener?.onListUpdated(newList)
+                listener?.onRefreshFinished()
+            }
+        }
+
+        currentTask?.cancel()
+        currentTask = task
         taskRunner.execute(task)
     }
 
-    @Synchronized
-    fun refreshHabit(id: Long) {
-        taskRunner.execute(RefreshTask(id))
+    fun cancelTasks() {
+        currentTask?.cancel()
+        currentTask = null
     }
 
-    @Synchronized
-    fun remove(id: Long) {
-        val position = data.habitIdToPosition[id] ?: data.groupIdToPosition[id] ?: return
-        val type = data.positionTypes[position]
-        if (type == STANDALONE_HABIT) {
-            val h = data.positionToHabit[position]
-            if (h != null) {
-                val idx = data.positionIndices[position]
-                data.topLevelItems.remove(h)
-                data.habits.removeAt(idx)
-                data.removeWithID(id, STANDALONE_HABIT)
-                data.rebuildPositions()
-                listener.onItemRemoved(position)
-            }
-        } else if (type == SUB_HABIT) {
-            val h = data.positionToHabit[position]
-            if (h != null) {
-                val hgrID = h.groupId
-                val hgrPos = data.groupIdToPosition[hgrID]
-                val hgr = data.positionToHabitGroup[hgrPos]
-                val hgrIdx = data.habitGroups.indexOf(hgr)
-                data.subHabits[hgrIdx].remove(h)
-                data.removeWithID(id, SUB_HABIT)
-                data.rebuildPositions()
-                listener.onItemRemoved(position)
-            }
-        } else if (type == HABIT_GROUP) {
-            val hgr = data.positionToHabitGroup[position]
-            if (hgr != null) {
-                val hgrIdx = data.positionIndices[position]
-                val subHabitsCopy = data.subHabits[hgrIdx].toList()
-                for (habit in subHabitsCopy.reversed()) {
-                    val habitPos = data.habitIdToPosition[habit.id]!!
-                    data.subHabits[hgrIdx].remove(habit)
-                    data.removeWithID(habit.id, SUB_HABIT)
-                    data.rebuildPositions()
-                    listener.onItemRemoved(habitPos)
+    private fun buildList(): List<HabitListItem> {
+        val filteredHabits = filter?.let { habits.getFiltered(it) } ?: habits
+        val filteredGroups = filter?.let { habitGroups.getFiltered(it) } ?: habitGroups
+
+        val result = mutableListOf<HabitListItem>()
+        val today = getToday()
+        val dateFrom = today.minus(checkmarkCount - 1)
+
+        val topLevelItems = mutableListOf<Any>()
+        topLevelItems.addAll(filteredHabits.filter { it.uuid != null && it.id != null })
+        topLevelItems.addAll(filteredGroups.filter { it.uuid != null && it.id != null })
+
+        val habitIndices = filteredHabits.withIndex().associate { it.value.id to it.index }
+        val groupIndices = filteredGroups.withIndex().associate { it.value.id to it.index }
+
+        topLevelItems.sortWith(
+            Comparator { o1, o2 ->
+                if (primaryOrder == HabitList.Order.BY_POSITION) {
+                    val p1 = if (o1 is Habit) o1.position else (o1 as HabitGroup).position
+                    val p2 = if (o2 is Habit) o2.position else (o2 as HabitGroup).position
+                    if (p1 != p2) return@Comparator p1.compareTo(p2)
                 }
-                data.topLevelItems.remove(hgr)
-                data.subHabits.removeAt(hgrIdx)
-                data.habitGroups.removeAt(hgrIdx)
-                data.removeWithID(hgr.id, HABIT_GROUP)
-                data.rebuildPositions()
-                listener.onItemRemoved(position)
+                if (o1.javaClass != o2.javaClass) {
+                    if (o1 is HabitGroup) -1 else 1
+                } else {
+                    if (o1 is Habit && o2 is Habit) {
+                        val idx1 = habitIndices[(o1 as Habit).id] ?: 0
+                        val idx2 = habitIndices[(o2 as Habit).id] ?: 0
+                        idx1.compareTo(idx2)
+                    } else if (o1 is HabitGroup && o2 is HabitGroup) {
+                        val idx1 = groupIndices[(o1 as HabitGroup).id] ?: 0
+                        val idx2 = groupIndices[(o2 as HabitGroup).id] ?: 0
+                        idx1.compareTo(idx2)
+                    } else {
+                        0
+                    }
+                }
             }
+        )
+
+        for (item in topLevelItems) {
+            if (item is Habit) {
+                result.add(buildHabitCardItem(item, today, dateFrom))
+            } else if (item is HabitGroup) {
+                result.add(HabitListItem.GroupItem(item))
+                if (!item.collapsed) {
+                    for (h in item.habitList) {
+                        if (h.uuid != null && h.id != null) {
+                            result.add(buildHabitCardItem(h, today, dateFrom))
+                        }
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    private fun buildHabitCardItem(habit: Habit, today: org.isoron.platform.time.LocalDate, dateFrom: org.isoron.platform.time.LocalDate): HabitListItem.HabitCardItem {
+        val score = habit.scores[today].value
+        val checkmarks = IntArray(checkmarkCount) { -1 }
+        val notes = Array(checkmarkCount) { "" }
+
+        val entries = habit.computedEntries.getByInterval(dateFrom, today)
+        for ((i, entry) in entries.withIndex()) {
+            if (i < checkmarkCount) {
+                checkmarks[i] = entry.value
+                notes[i] = if (entry.notes.isNotEmpty()) "note" else ""
+            }
+        }
+
+        return HabitListItem.HabitCardItem(habit, checkmarks, score, notes)
+    }
+
+    fun getHabitByPosition(position: Int): Habit? {
+        val item = currentList.getOrNull(position)
+        return (item as? HabitListItem.HabitCardItem)?.habit
+    }
+
+    fun getHabitGroupByPosition(position: Int): HabitGroup? {
+        val item = currentList.getOrNull(position)
+        return (item as? HabitListItem.GroupItem)?.group
+    }
+
+    fun getIdByPosition(position: Int): Long? {
+        return currentList.getOrNull(position)?.id
+    }
+
+    fun getScore(id: Long): Double {
+        val item = currentList.find { it.id == id }
+        return when (item) {
+            is HabitListItem.HabitCardItem -> item.score
+            is HabitListItem.GroupItem -> item.group.scores[getToday()].value
+            else -> 0.0
         }
     }
 
-    @Synchronized
+    fun getCheckmarks(id: Long): IntArray {
+        val item = currentList.find { it.id == id }
+        return if (item is HabitListItem.HabitCardItem) item.checkmarks else IntArray(checkmarkCount) { -1 }
+    }
+
+    fun getNotes(id: Long): Array<String> {
+        val item = currentList.find { it.id == id }
+        if (item is HabitListItem.HabitCardItem) {
+            return item.notes
+        }
+        return Array(checkmarkCount) { "" }
+    }
+
     fun getTopLevelItems(): List<Any> {
-        return ArrayList(data.topLevelItems)
-    }
-
-    @Synchronized
-    fun reorder(from: Int, to: Int) {
-        if (from < 0 || to < 0 || from == to) return
-        val type = data.positionTypes.getOrNull(from) ?: return
-        if (type == STANDALONE_HABIT || type == SUB_HABIT) {
-            val habit = data.positionToHabit[from]!!
-            data.performMove(habit, from, to)
-        } else {
-            val habitGroup = data.positionToHabitGroup[from]!!
-            data.performMove(habitGroup, from, to)
+        return currentList.mapNotNull {
+            when (it) {
+                is HabitListItem.GroupItem -> it.group
+                is HabitListItem.HabitCardItem -> if (it.habit.groupId == null) it.habit else null
+            }
         }
     }
 
-    @Synchronized
     fun getSubHabitCountForGroup(group: HabitGroup): Int {
-        val hgrIdx = data.habitGroups.indexOf(group)
-        if (hgrIdx < 0) return 0
-        return data.subHabits.getOrNull(hgrIdx)?.size ?: 0
+        return group.habitList.size()
     }
 
-    @Synchronized
-    fun setCheckmarkCount(checkmarkCount: Int) {
-        this.checkmarkCount = checkmarkCount
-    }
-
-    @Synchronized
-    fun setFilter(matcher: HabitMatcher) {
-        filteredHabits = habits.getFiltered(matcher)
-        filteredHabitGroups = habitGroups.getFiltered(matcher)
-    }
-
-    @Synchronized
-    fun setListener(listener: Listener) {
-        this.listener = listener
-    }
-
-    /**
-     * Interface definition for a callback to be invoked when the data on the
-     * cache has been modified.
-     */
-    interface Listener {
-        fun onItemChanged(position: Int) {}
-        fun onItemInserted(position: Int) {}
-        fun onItemMoved(oldPosition: Int, newPosition: Int) {}
-        fun onItemRemoved(position: Int) {}
-        fun onRefreshFinished() {}
-    }
-
-    private inner class CacheData {
-        val topLevelItems: MutableList<Any>
-        val habits: MutableList<Habit>
-        val habitGroups: MutableList<HabitGroup>
-        val subHabits: MutableList<MutableList<Habit>>
-        val habitIdToPosition: MutableMap<Long?, Int>
-        val groupIdToPosition: MutableMap<Long?, Int>
-        val positionTypes: MutableList<Int>
-        val positionIndices: MutableList<Int>
-        val positionToHabit: MutableMap<Int, Habit>
-        val positionToHabitGroup: MutableMap<Int, HabitGroup>
-        val checkmarks: MutableMap<Long?, IntArray>
-        val scores: MutableMap<Long?, Double>
-        val notes: MutableMap<Long?, Array<String>>
-
-        @Synchronized
-        fun copyCheckmarksFrom(oldData: CacheData) {
-            val empty = IntArray(checkmarkCount) { -1 }
-            for (id in habitIdToPosition.keys) {
-                if (oldData.checkmarks.containsKey(id)) {
-                    checkmarks[id] =
-                        oldData.checkmarks[id]!!
-                } else {
-                    checkmarks[id] = empty
-                }
-            }
-        }
-
-        @Synchronized
-        fun copyNoteIndicatorsFrom(oldData: CacheData) {
-            val empty = (0..checkmarkCount).map { "" }.toTypedArray()
-            for (id in habitIdToPosition.keys) {
-                if (oldData.notes.containsKey(id)) {
-                    notes[id] =
-                        oldData.notes[id]!!
-                } else {
-                    notes[id] = empty
-                }
-            }
-        }
-
-        @Synchronized
-        fun copyScoresFrom(oldData: CacheData) {
-            for (id in habitIdToPosition.keys) {
-                if (oldData.scores.containsKey(id)) {
-                    scores[id] =
-                        oldData.scores[id]!!
-                } else {
-                    scores[id] = 0.0
-                }
-            }
-            for (id in groupIdToPosition.keys) {
-                if (oldData.scores.containsKey(id)) {
-                    scores[id] =
-                        oldData.scores[id]!!
-                } else {
-                    scores[id] = 0.0
-                }
-            }
-        }
-
-        @Synchronized
-        fun fetchHabits() {
-            val list = mutableListOf<Any>()
-            for (h in filteredHabits) {
-                if (h.uuid == null || h.id == null) continue
-                list.add(h)
-            }
-
-            val subHabitsMap = mutableMapOf<Long, MutableList<Habit>>()
-            for (hgr in filteredHabitGroups) {
-                if (hgr.uuid == null || hgr.id == null) continue
-                list.add(hgr)
-                val habitList = mutableListOf<Habit>()
-                for (h in hgr.habitList) {
-                    habitList.add(h)
-                }
-                subHabitsMap[hgr.id!!] = habitList
-            }
-
-            val positions = list.map {
-                when (it) {
-                    is Habit -> it.position
-                    is HabitGroup -> it.position
-                    else -> 0
-                }
-            }
-
-            val habitIndicesMap = filteredHabits.withIndex().associate { it.value.id to it.index }
-            val groupIndicesMap = filteredHabitGroups.withIndex().associate { it.value.id to it.index }
-
-            list.sortWith(
-                Comparator { o1, o2 ->
-                    val p1 = when (o1) {
-                        is Habit -> o1.position
-                        is HabitGroup -> o1.position
-                        else -> 0
-                    }
-                    val p2 = when (o2) {
-                        is Habit -> o2.position
-                        is HabitGroup -> o2.position
-                        else -> 0
-                    }
-                    if (p1 != p2) {
-                        p1.compareTo(p2)
-                    } else {
-                        if (o1.javaClass != o2.javaClass) {
-                            if (o1 is Habit) -1 else 1
-                        } else {
-                            if (o1 is Habit && o2 is Habit) {
-                                val idx1 = habitIndicesMap[o1.id] ?: 0
-                                val idx2 = habitIndicesMap[o2.id] ?: 0
-                                idx1.compareTo(idx2)
-                            } else if (o1 is HabitGroup && o2 is HabitGroup) {
-                                val idx1 = groupIndicesMap[o1.id] ?: 0
-                                val idx2 = groupIndicesMap[o2.id] ?: 0
-                                idx1.compareTo(idx2)
-                            } else {
-                                0
-                            }
-                        }
-                    }
-                }
-            )
-
-            topLevelItems.clear()
-            topLevelItems.addAll(list)
-
-            habits.clear()
-            habitGroups.clear()
-            subHabits.clear()
-
-            for (item in topLevelItems) {
-                if (item is Habit) {
-                    habits.add(item)
-                } else if (item is HabitGroup) {
-                    habitGroups.add(item)
-                    val sh = subHabitsMap[item.id!!] ?: mutableListOf()
-                    subHabits.add(sh)
-                }
-            }
-        }
-
-        @Synchronized
-        fun rebuildPositions() {
-            positionToHabit.clear()
-            positionToHabitGroup.clear()
-            habitIdToPosition.clear()
-            groupIdToPosition.clear()
-            positionTypes.clear()
-            positionIndices.clear()
-            var position = 0
-
-            var standaloneIdx = 0
-            var groupIdx = 0
-
-            for (item in topLevelItems) {
-                if (item is Habit) {
-                    habitIdToPosition[item.id] = position
-                    positionToHabit[position] = item
-                    positionTypes.add(STANDALONE_HABIT)
-                    positionIndices.add(standaloneIdx)
-                    standaloneIdx++
-                    position++
-                } else if (item is HabitGroup) {
-                    groupIdToPosition[item.id] = position
-                    positionToHabitGroup[position] = item
-                    positionTypes.add(HABIT_GROUP)
-                    positionIndices.add(groupIdx)
-                    val habitList = subHabits[groupIdx]
-                    groupIdx++
-                    position++
-
-                    // Only show sub-habits when the group is not collapsed
-                    if (!item.collapsed) {
-                        for ((hIdx, h) in habitList.withIndex()) {
-                            habitIdToPosition[h.id] = position
-                            positionToHabit[position] = h
-                            positionTypes.add(SUB_HABIT)
-                            positionIndices.add(hIdx)
-                            position++
-                        }
-                    }
-                }
-            }
-        }
-
-        @Synchronized
-        fun isValidInsert(habit: Habit, position: Int): Boolean {
-            if (habit.groupId == null) {
-                return (position == positionTypes.size) ||
-                    (position < positionTypes.size && (positionTypes[position] == STANDALONE_HABIT || positionTypes[position] == HABIT_GROUP))
-            } else {
-                val parentPos = groupIdToPosition[habit.groupId] ?: return false
-                val parent = positionToHabitGroup[parentPos] ?: return false
-                val parentPosition = groupIdToPosition[habit.groupId]!!
-                val parentIndex = habitGroups.indexOf(parent)
-                val nextGroup = habitGroups.getOrNull(parentIndex + 1)
-                val nextGroupPosition = groupIdToPosition[nextGroup?.id]
-                return (position > parentPosition && position <= positionTypes.size) && (nextGroupPosition == null || position <= nextGroupPosition)
-            }
-        }
-
-        @Synchronized
-        fun isValidInsert(habitGroup: HabitGroup, position: Int): Boolean {
-            return (position == positionTypes.size) ||
-                (position < positionTypes.size && (positionTypes[position] == STANDALONE_HABIT || positionTypes[position] == HABIT_GROUP))
-        }
-
-        private fun moveTopLevelItem(item: Any, fromTopLevelIdx: Int, targetItem: Any?) {
-            if (fromTopLevelIdx >= 0 && targetItem != null) {
-                val origToTopLevelIdx = topLevelItems.indexOf(targetItem)
-                if (fromTopLevelIdx == origToTopLevelIdx) return
-
-                topLevelItems.removeAt(fromTopLevelIdx)
-                val newToTopLevelIdx = topLevelItems.indexOf(targetItem)
-
-                val insertIdx = if (fromTopLevelIdx < origToTopLevelIdx) {
-                    newToTopLevelIdx + 1
-                } else {
-                    newToTopLevelIdx
-                }
-                topLevelItems.add(insertIdx, item)
-            } else {
-                if (fromTopLevelIdx >= 0) {
-                    topLevelItems.removeAt(fromTopLevelIdx)
-                    topLevelItems.add(item)
-                }
-            }
-        }
-
-        @Synchronized
-        fun getTopLevelItemOf(position: Int): Any? {
-            val type = positionTypes.getOrNull(position) ?: return null
-            return when (type) {
-                STANDALONE_HABIT -> positionToHabit[position]
-                HABIT_GROUP -> positionToHabitGroup[position]
-                SUB_HABIT -> {
-                    val habit = positionToHabit[position]
-                    val parentGroupPos = groupIdToPosition[habit?.groupId] ?: return null
-                    positionToHabitGroup[parentGroupPos]
-                }
-                else -> null
-            }
-        }
-
-        fun performMove(
-            habit: Habit,
-            fromPosition: Int,
-            toPosition: Int
-        ) {
-            val type = positionTypes[fromPosition]
-            if (type == HABIT_GROUP) return
-
-            val checkedToPosition = if (toPosition >= positionTypes.size) {
-                positionTypes.size - 1
-            } else {
-                toPosition
-            }
-
-            if (type == STANDALONE_HABIT) {
-                val fromTopLevelIdx = topLevelItems.indexOf(habit)
-                val targetItem = getTopLevelItemOf(checkedToPosition)
-                moveTopLevelItem(habit, fromTopLevelIdx, targetItem)
-            } else {
-                val verifyPosition = if (fromPosition > checkedToPosition) checkedToPosition else checkedToPosition + 1
-                if (!isValidInsert(habit, verifyPosition)) return
-
-                var hgrPos = fromPosition - 1
-                while (hgrPos >= 0 && positionTypes[hgrPos] != HABIT_GROUP) {
-                    hgrPos--
-                }
-                if (hgrPos < 0) return
-                val hgr = positionToHabitGroup[hgrPos]!!
-                val hgrIdx = habitGroups.indexOf(hgr)
-                val fromIdx = positionIndices[fromPosition]
-                subHabits[hgrIdx].removeAt(fromIdx)
-
-                val toIdx = checkedToPosition - hgrPos - 1
-                subHabits[hgrIdx].add(toIdx, habit)
-            }
-
-            // Sync
-            val tempGroups = habitGroups.toList()
-            val tempSubHabits = subHabits.toList()
-            habits.clear()
-            habitGroups.clear()
-            subHabits.clear()
-            val subHabitsMap = mutableMapOf<Long, MutableList<Habit>>()
-            for (idx in tempSubHabits.indices) {
-                val gId = tempGroups.getOrNull(idx)?.id ?: continue
-                subHabitsMap[gId] = tempSubHabits[idx]
-            }
-            for (item in topLevelItems) {
-                if (item is Habit) {
-                    habits.add(item)
-                } else if (item is HabitGroup) {
-                    habitGroups.add(item)
-                    subHabits.add(subHabitsMap[item.id!!] ?: mutableListOf())
-                }
-            }
-
-            rebuildPositions()
-            listener.onItemMoved(fromPosition, checkedToPosition)
-        }
-
-        @Synchronized
-        fun performMove(
-            habitGroup: HabitGroup,
-            fromPosition: Int,
-            toPosition: Int
-        ) {
-            if (positionTypes[fromPosition] != HABIT_GROUP) return
-
-            val checkedToPosition = if (toPosition >= positionTypes.size) {
-                positionTypes.size - 1
-            } else {
-                toPosition
-            }
-
-            val fromTopLevelIdx = topLevelItems.indexOf(habitGroup)
-            val targetItem = getTopLevelItemOf(checkedToPosition)
-            moveTopLevelItem(habitGroup, fromTopLevelIdx, targetItem)
-
-            // Sync
-            val tempGroups = habitGroups.toList()
-            val tempSubHabits = subHabits.toList()
-            habits.clear()
-            habitGroups.clear()
-            subHabits.clear()
-            val subHabitsMap = mutableMapOf<Long, MutableList<Habit>>()
-            for (idx in tempSubHabits.indices) {
-                val gId = tempGroups.getOrNull(idx)?.id ?: continue
-                subHabitsMap[gId] = tempSubHabits[idx]
-            }
-            for (item in topLevelItems) {
-                if (item is Habit) {
-                    habits.add(item)
-                } else if (item is HabitGroup) {
-                    habitGroups.add(item)
-                    subHabits.add(subHabitsMap[item.id!!] ?: mutableListOf())
-                }
-            }
-
-            rebuildPositions()
-            listener.onItemMoved(fromPosition, checkedToPosition)
-        }
-
-        fun removeWithID(id: Long?, type: Int) {
-            if (type == HABIT_GROUP) {
-                groupIdToPosition.remove(id)
-            } else {
-                habitIdToPosition.remove(id)
-            }
-            scores.remove(id)
-            notes.remove(id)
-            checkmarks.remove(id)
-        }
-
-        /**
-         * Creates a new CacheData without any content.
-         */
-        init {
-            topLevelItems = mutableListOf()
-            habits = mutableListOf()
-            habitGroups = mutableListOf()
-            subHabits = mutableListOf()
-            positionTypes = mutableListOf()
-            positionIndices = mutableListOf()
-            habitIdToPosition = mutableMapOf()
-            groupIdToPosition = mutableMapOf()
-            positionToHabit = mutableMapOf()
-            positionToHabitGroup = mutableMapOf()
-            checkmarks = mutableMapOf()
-            scores = mutableMapOf()
-            notes = mutableMapOf()
+    fun remove(id: Long) {
+        val mut = currentList.toMutableList()
+        val idx = mut.indexOfFirst { it.id == id }
+        if (idx >= 0) {
+            mut.removeAt(idx)
+            currentList = mut
+            listener?.onListUpdated(mut)
         }
     }
 
-    private inner class RefreshTask : Task {
-        private val newData: CacheData
-        private val targetID: Long?
-        private var isCancelled = false
-        private var runner: TaskRunner? = null
-
-        constructor() {
-            newData = CacheData()
-            targetID = null
-            isCancelled = false
+    fun reorder(from: Int, to: Int) {
+        val mut = currentList.toMutableList()
+        if (from in mut.indices && to in mut.indices) {
+            val item = mut.removeAt(from)
+            mut.add(to, item)
+            currentList = mut
+            listener?.onListUpdated(mut)
         }
-
-        constructor(targetID: Long) {
-            newData = CacheData()
-            this.targetID = targetID
-        }
-
-        @Synchronized
-        override fun cancel() {
-            isCancelled = true
-        }
-
-        @Synchronized
-        override fun doInBackground() {
-            newData.fetchHabits()
-            newData.rebuildPositions()
-            newData.copyScoresFrom(data)
-            newData.copyCheckmarksFrom(data)
-            newData.copyNoteIndicatorsFrom(data)
-            val today = getToday()
-            val dateFrom = today.minus(checkmarkCount - 1)
-            if (runner != null) runner!!.publishProgress(this, -1)
-            for ((position, type) in newData.positionTypes.withIndex()) {
-                if (isCancelled) return
-                if (type == STANDALONE_HABIT || type == SUB_HABIT) {
-                    val habit = newData.positionToHabit[position]!!
-                    if (targetID != null && targetID != habit.id) continue
-                    newData.scores[habit.id] = habit.scores[today].value
-                    val checkmarkList = mutableListOf<Int>()
-                    val noteList = mutableListOf<String>()
-                    for ((_, value, note) in habit.computedEntries.getByInterval(dateFrom, today)) {
-                        checkmarkList.add(value)
-                        noteList.add(note)
-                    }
-                    newData.checkmarks[habit.id] = checkmarkList.toIntArray()
-                    newData.notes[habit.id] = noteList.toTypedArray()
-                    runner!!.publishProgress(this, position)
-                } else if (type == HABIT_GROUP) {
-                    val habitGroup = newData.positionToHabitGroup[position]!!
-                    if (targetID != null && targetID != habitGroup.id) continue
-                    newData.scores[habitGroup.id] = habitGroup.scores[today].value
-                    runner!!.publishProgress(this, position)
-                }
-            }
-        }
-
-        @Synchronized
-        override fun onAttached(runner: TaskRunner) {
-            this.runner = runner
-        }
-
-        @Synchronized
-        override fun onPostExecute() {
-            currentFetchTask = null
-            listener.onRefreshFinished()
-        }
-
-        @Synchronized
-        override fun onProgressUpdate(currentPosition: Int) {
-            if (currentPosition < 0) processRemovedHabits() else processPosition(currentPosition)
-        }
-
-        @Synchronized
-        private fun performInsert(habit: Habit, position: Int) {
-            if (!data.isValidInsert(habit, position)) return
-            val id = habit.id
-            val habitIndex = newData.positionIndices[position]
-            if (habit.groupId == null) {
-                data.habits.add(habitIndex, habit)
-                val targetItem = data.positionToHabit[position] ?: data.positionToHabitGroup[position]
-                val targetIdx = if (targetItem != null) data.topLevelItems.indexOf(targetItem) else data.topLevelItems.size
-                data.topLevelItems.add(if (targetIdx >= 0) targetIdx else data.topLevelItems.size, habit)
-            } else {
-                val hgrPos = data.groupIdToPosition[habit.groupId]!!
-                val hgrIdx = data.positionIndices[hgrPos]
-                data.subHabits[hgrIdx].add(habitIndex, habit)
-            }
-            data.scores[id] = newData.scores[id]!!
-            data.checkmarks[id] = newData.checkmarks[id]!!
-            data.notes[id] = newData.notes[id]!!
-
-            data.rebuildPositions()
-            listener.onItemInserted(position)
-        }
-
-        @Synchronized
-        private fun performInsert(habitGroup: HabitGroup, position: Int) {
-            if (!data.isValidInsert(habitGroup, position)) return
-            val id = habitGroup.id
-            val idx = newData.positionIndices[position]
-
-            data.habitGroups.add(idx, habitGroup)
-
-            val targetItem = data.positionToHabit[position] ?: data.positionToHabitGroup[position]
-            val targetIdx = if (targetItem != null) data.topLevelItems.indexOf(targetItem) else data.topLevelItems.size
-            data.topLevelItems.add(if (targetIdx >= 0) targetIdx else data.topLevelItems.size, habitGroup)
-
-            data.subHabits.add(idx, mutableListOf())
-            data.scores[id] = newData.scores[id]!!
-
-            data.rebuildPositions()
-            listener.onItemInserted(position)
-        }
-
-        @Synchronized
-        private fun performUpdate(id: Long, position: Int) {
-            var unchanged = true
-            val oldScore = data.scores[id]!!
-            val newScore = newData.scores[id]!!
-            if (oldScore != newScore) unchanged = false
-
-            if (newData.positionTypes[position] != HABIT_GROUP) {
-                val oldCheckmarks = data.checkmarks[id]
-                val newCheckmarks = newData.checkmarks[id]!!
-                val oldNoteIndicators = data.notes[id]
-                val newNoteIndicators = newData.notes[id]!!
-                if (!oldCheckmarks.contentEquals(newCheckmarks)) unchanged = false
-                if (!oldNoteIndicators.contentEquals(newNoteIndicators)) unchanged = false
-                if (unchanged) return
-                data.checkmarks[id] = newCheckmarks
-                data.notes[id] = newNoteIndicators
-            }
-
-            if (unchanged) return
-            data.scores[id] = newScore
-            listener.onItemChanged(position)
-        }
-
-        @Synchronized
-        private fun processPosition(currentPosition: Int) {
-            val type = newData.positionTypes[currentPosition]
-
-            if (type == STANDALONE_HABIT || type == SUB_HABIT) {
-                val habit = newData.positionToHabit[currentPosition]!!
-                val id = habit.id ?: throw NullPointerException()
-                val prevPosition = data.habitIdToPosition[id] ?: -1
-                val oldHabit = if (prevPosition >= 0) data.positionToHabit[prevPosition] else null
-
-                if (prevPosition < 0 || oldHabit?.groupId != habit.groupId) {
-                    if (prevPosition >= 0) remove(id)
-
-                    val newPosition = if (type == STANDALONE_HABIT) {
-                        currentPosition
-                    } else {
-                        val hgrPos = data.groupIdToPosition[habit.groupId]!!
-                        val newHgrPos = newData.groupIdToPosition[habit.groupId]!! // Get new position
-                        val newHgrIdx = newData.positionIndices[newHgrPos] // Get new index
-                        newData.subHabits[newHgrIdx].indexOf(habit) + hgrPos + 1
-                    }
-
-                    performInsert(habit, newPosition)
-                } else {
-                    val newPosition = if (type == STANDALONE_HABIT) {
-                        currentPosition
-                    } else {
-                        val hgrPos = data.groupIdToPosition[habit.groupId]!!
-                        val newHgrPos = newData.groupIdToPosition[habit.groupId]!! // Get new position
-                        val newHgrIdx = newData.positionIndices[newHgrPos] // Get new index
-                        newData.subHabits[newHgrIdx].indexOf(habit) + hgrPos + 1
-                    }
-
-                    if (prevPosition != newPosition) {
-                        data.performMove(
-                            habit,
-                            prevPosition,
-                            newPosition
-                        )
-                    }
-                    performUpdate(id, currentPosition)
-                }
-            } else if (type == HABIT_GROUP) {
-                val habitGroup = newData.positionToHabitGroup[currentPosition]!!
-                val id = habitGroup.id ?: throw NullPointerException()
-                val prevPosition = data.groupIdToPosition[id] ?: -1
-                if (prevPosition < 0) {
-                    performInsert(habitGroup, currentPosition)
-                } else {
-                    if (prevPosition != currentPosition) {
-                        data.performMove(
-                            habitGroup,
-                            prevPosition,
-                            currentPosition
-                        )
-                    }
-                    performUpdate(id, currentPosition)
-                }
-            }
-        }
-
-        @Synchronized
-        private fun processRemovedHabits() {
-            val beforeHabits: Set<Long?> = data.habitIdToPosition.keys
-            val beforeGroups: Set<Long?> = data.groupIdToPosition.keys
-            val afterHabits: Set<Long?> = newData.habitIdToPosition.keys
-            val afterGroups: Set<Long?> = newData.groupIdToPosition.keys
-            val removedHabits = beforeHabits - afterHabits
-            val removedGroups = beforeGroups - afterGroups
-
-            for (hId in removedHabits.sortedByDescending { data.habitIdToPosition[it] ?: -1 }) {
-                remove(hId!!)
-            }
-
-            for (grId in removedGroups.sortedByDescending { data.groupIdToPosition[it] ?: -1 }) {
-                remove(grId!!)
-            }
-        }
-    }
-
-    companion object {
-        const val STANDALONE_HABIT = 0
-        const val HABIT_GROUP = 1
-        const val SUB_HABIT = 2
-    }
-
-    init {
-        filteredHabits = habits
-        filteredHabitGroups = habitGroups
-
-        this.taskRunner = taskRunner
-        listener = object : Listener {}
-        data = CacheData()
     }
 }

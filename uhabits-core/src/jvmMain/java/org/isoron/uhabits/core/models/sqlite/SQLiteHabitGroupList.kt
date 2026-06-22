@@ -20,33 +20,33 @@ class SQLiteHabitGroupList(
     private val widgetPreferences: WidgetPreferences // Added Injection
 ) : HabitGroupList() {
     private val repository: Repository<HabitGroupRecord> = modelFactory.buildHabitGroupListRepository()
-    private val list: MemoryHabitGroupList = MemoryHabitGroupList()
+    private val list: MemoryHabitGroupList = MemoryHabitGroupList().apply {
+        unfilteredRoot = this@SQLiteHabitGroupList
+    }
     private var loaded = false
     private fun loadRecords() {
         if (loaded) return
         loaded = true
         list.removeAll()
         val records = repository.findAll("order by position")
-        var shouldRebuildOrder = false
-        for ((expectedPosition, rec) in records.withIndex()) {
-            if (rec.position != expectedPosition) shouldRebuildOrder = true
+        for (rec in records) {
             val h = modelFactory.buildHabitGroup()
             rec.copyTo(h)
             list.add(h)
         }
         attachHabitsToGroups()
-        if (shouldRebuildOrder) rebuildOrder()
     }
 
     @Synchronized
     override fun add(habitGroup: HabitGroup) {
         loadRecords()
-        habitGroup.position = size()
+        habitGroup.position = (list.maxOfOrNull { it.position } ?: -1) + 1
         habitGroup.id = repository.getNextAvailableId("habitandgroup")
         val record = HabitGroupRecord()
         record.copyFrom(habitGroup)
         repository.save(record)
         habitGroup.habitList.groupId = record.id
+        habitGroup.habitList.groupUUID = record.uuid
         list.add(habitGroup)
         observable.notifyListeners()
     }
@@ -163,7 +163,10 @@ class SQLiteHabitGroupList(
     @Synchronized
     override fun reorder(from: HabitGroup, to: HabitGroup) {
         loadRecords()
-        list.reorder(from, to)
+
+        val actualFrom = list.getById(from.id!!) ?: from
+        val actualTo = list.getById(to.id!!) ?: to
+        list.reorder(actualFrom, actualTo)
         val fromRecord = repository.find(
             from.id!!
         )
@@ -214,6 +217,7 @@ class SQLiteHabitGroupList(
             record.copyFrom(hgr)
             repository.save(record)
         }
+        loaded = false
         observable.notifyListeners()
     }
 

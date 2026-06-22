@@ -25,27 +25,29 @@ class CollapseButtonView(
     private var drawer = Drawer()
 
     var collapsed = false
-        set(value) {
-            field = value
+
+    fun setCollapsedWithoutAnimation(value: Boolean) {
+        if (collapsed != value) {
+            collapsed = value
             drawer.rotate()
             invalidate()
         }
+    }
 
     init {
         setOnClickListener(this)
     }
 
     override fun onClick(v: View) {
-        collapsed = !collapsed
         val group = habitGroup ?: return
         val target = group.parent ?: group
-        target.collapsed = collapsed
+        val newState = !target.collapsed
 
-        val appComponent = (context as ListHabitsActivity).appComponent
-        appComponent.habitGroupList.update(target)
+        target.collapsed = newState
+        this.collapsed = newState
 
         val component = (context as ListHabitsActivity).component
-        component.habitCardListAdapter.refresh()
+        component.listHabitsBehavior.onToggleHabitGroupCollapse(target)
 
         drawer.animateRotation()
     }
@@ -107,7 +109,7 @@ class CollapseButtonView(
         fun draw(canvas: Canvas) {
             paint.color = highContrastColor
             val id = R.string.fa_angle_down
-            paint.textSize = sp(12.0f)
+            paint.textSize = sp(18.0f)
             paint.strokeWidth = 0f
             paint.style = Paint.Style.FILL
 
@@ -119,7 +121,9 @@ class CollapseButtonView(
 
             canvas.save()
             canvas.rotate(rotationAngle, rect.centerX(), rect.centerY())
-            canvas.drawText(label, rect.centerX(), rect.centerY(), paint)
+            val fontMetrics = paint.fontMetrics
+            val baseline = rect.centerY() - (fontMetrics.ascent + fontMetrics.descent) / 2f
+            canvas.drawText(label, rect.centerX(), baseline, paint)
             canvas.restore()
         }
     }

@@ -60,7 +60,8 @@
         <TextView
             android:id="@+id/skipBtn"
             style="@style/CheckmarkPopupBtn"
-            android:text="@string/fa_skipped" />
+            android:text="@string/fa_check"
+            android:textColor="?attr/yellowColor" />
 
         <TextView
             android:id="@+id/noBtn"

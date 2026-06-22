@@ -1,0 +1,37 @@
+Configuration on demand is an incubating feature.
+> Task :uhabits-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :uhabits-core:compileKotlinJvm UP-TO-DATE
+> Task :uhabits-core:compileJava NO-SOURCE
+> Task :uhabits-core:jvmProcessResources UP-TO-DATE
+> Task :uhabits-core:jvmMainClasses UP-TO-DATE
+> Task :uhabits-core:jvmJar UP-TO-DATE
+> Task :uhabits-core:compileTestKotlinJvm UP-TO-DATE
+> Task :uhabits-core:compileTestJava NO-SOURCE
+> Task :uhabits-core:jvmTestProcessResources NO-SOURCE
+> Task :uhabits-core:jvmTestClasses UP-TO-DATE
+
+> Task :uhabits-core:jvmTest
+
+HabitCardListCacheTest[jvm] > testReorder_onList[jvm] FAILED
+    org.mockito.exceptions.verification.TooManyActualInvocations at HabitCardListCacheTest.kt:212
+
+HabitCardListCacheTest[jvm] > testCommandListener_single[jvm] FAILED
+    org.mockito.exceptions.verification.TooManyActualInvocations at HabitCardListCacheTest.kt:110
+
+HabitCardListCacheTest[jvm] > testReorder_onCache_Groups[jvm] FAILED
+    java.lang.AssertionError at HabitCardListCacheTest.kt:195
+
+HabitCardListCacheTest[jvm] > testReorder_onList_Groups[jvm] FAILED
+    org.mockito.exceptions.verification.TooManyActualInvocations at HabitCardListCacheTest.kt:230
+
+HabitCardListCacheTest[jvm] > testCommandListener_delete_hgr[jvm] FAILED
+    org.mockito.exceptions.verification.TooManyActualInvocations at HabitCardListCacheTest.kt:93
+
+HabitCardListCacheTest[jvm] > testRemoval[jvm] FAILED
+    org.mockito.exceptions.verification.TooManyActualInvocations at HabitCardListCacheTest.kt:164
+
+HabitCardListCacheTest[jvm] > testCommandListener_delete_habit[jvm] FAILED
+    org.mockito.exceptions.verification.TooManyActualInvocations at HabitCardListCacheTest.kt:81
+
+> Task :uhabits-core:jvmTest FAILED
+5 actionable tasks: 1 executed, 4 up-to-date

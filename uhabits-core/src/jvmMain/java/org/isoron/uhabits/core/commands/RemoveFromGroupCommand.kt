@@ -28,10 +28,10 @@ data class RemoveFromGroupCommand(
     override fun run() {
         for (habit in selected) {
             val hgr = habit.group!!
+            hgr.habitList.unfiltered.move(habit, habitList.unfiltered)
             habit.groupId = null
             habit.group = null
             habit.groupUUID = null
-            hgr.habitList.move(habit, habitList)
             habit.observable.notifyListeners()
         }
     }

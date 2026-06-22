@@ -85,6 +85,7 @@ class HabitGroupRecord {
         habitGroup.position = position!!
         habitGroup.uuid = uuid
         habitGroup.habitList.groupId = id
+        habitGroup.habitList.groupUUID = uuid
         if (reminderHour != null && reminderMin != null) {
             habitGroup.reminder = Reminder(
                 reminderHour!!,

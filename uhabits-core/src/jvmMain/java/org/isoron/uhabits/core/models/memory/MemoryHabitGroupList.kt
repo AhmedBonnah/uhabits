@@ -34,6 +34,18 @@ class MemoryHabitGroupList : HabitGroupList {
         getComposedComparatorByOrder(primaryOrder, secondaryOrder)
     private var parent: MemoryHabitGroupList? = null
 
+    var unfilteredRoot: HabitGroupList? = null
+
+    override val unfiltered: HabitGroupList
+        get() {
+            if (unfilteredRoot != null) return unfilteredRoot!!
+            var current: HabitGroupList = this
+            while (current is MemoryHabitGroupList && current.parent != null) {
+                current = current.parent!!
+            }
+            return current
+        }
+
     constructor() : super()
     constructor(
         matcher: HabitMatcher,
@@ -41,6 +53,7 @@ class MemoryHabitGroupList : HabitGroupList {
         parent: MemoryHabitGroupList
     ) : super(matcher) {
         this.parent = parent
+        this.unfilteredRoot = parent.unfilteredRoot
         this.comparator = comparator
         primaryOrder = parent.primaryOrder
         secondaryOrder = parent.secondaryOrder
@@ -172,7 +185,7 @@ class MemoryHabitGroupList : HabitGroupList {
         require(toPos >= 0) { "list does not contain (to) habit" }
         list.remove(from)
         list.add(toPos, from)
-        var position = 0
+        var position = list.minOfOrNull { it.position } ?: 0
         for (h in list) h.position = position++
         observable.notifyListeners()
     }
@@ -214,6 +227,7 @@ class MemoryHabitGroupList : HabitGroupList {
         }
         primaryOrder = parent!!.primaryOrder
         secondaryOrder = parent!!.secondaryOrder
+        resort()
     }
 
     @Synchronized

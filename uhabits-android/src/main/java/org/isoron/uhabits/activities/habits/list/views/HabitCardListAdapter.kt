@@ -1,26 +1,9 @@
-/*
- * Copyright (C) 2016-2025 Álinson Santos Xavier <git@axavier.org>
- *
- * This file is part of Loop Habit Tracker.
- *
- * Loop Habit Tracker is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or (at your
- * option) any later version.
- *
- * Loop Habit Tracker is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
 package org.isoron.uhabits.activities.habits.list.views
 
 import android.annotation.SuppressLint
 import android.view.ViewGroup
-import androidx.recyclerview.widget.RecyclerView.Adapter
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import me.tatarka.inject.annotations.Inject
 import org.isoron.uhabits.activities.habits.list.MAX_CHECKMARK_COUNT
 import org.isoron.uhabits.core.models.Habit
@@ -30,30 +13,35 @@ import org.isoron.uhabits.core.models.HabitMatcher
 import org.isoron.uhabits.core.models.ModelObservable
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.ui.screens.habits.list.HabitCardListCache
+import org.isoron.uhabits.core.ui.screens.habits.list.HabitListItem
 import org.isoron.uhabits.core.ui.screens.habits.list.ListHabitsMenuBehavior
 import org.isoron.uhabits.core.ui.screens.habits.list.ListHabitsSelectionMenuBehavior
 import org.isoron.uhabits.core.utils.MidnightTimer
 import org.isoron.uhabits.inject.ActivityScope
 import java.util.LinkedList
 
-/**
- * Provides data that backs a [HabitCardListView].
- *
- *
- * The data is fetched and cached by a [HabitCardListCache]. This adapter
- * also holds a list of items that have been selected.
- */
 @Inject
 @ActivityScope
 class HabitCardListAdapter(
     private val cache: HabitCardListCache,
     private val preferences: Preferences,
     private val midnightTimer: MidnightTimer
-) : Adapter<HabitCardViewHolder?>(),
+) : ListAdapter<HabitListItem, HabitCardViewHolder>(ItemDiffCallback()),
     HabitCardListCache.Listener,
     MidnightTimer.MidnightListener,
     ListHabitsMenuBehavior.Adapter,
     ListHabitsSelectionMenuBehavior.Adapter {
+
+    class ItemDiffCallback : DiffUtil.ItemCallback<HabitListItem>() {
+        override fun areItemsTheSame(oldItem: HabitListItem, newItem: HabitListItem): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: HabitListItem, newItem: HabitListItem): Boolean {
+            return oldItem == newItem
+        }
+    }
+
     val observable: ModelObservable = ModelObservable()
     private var listView: HabitCardListView? = null
     val selectedHabits: LinkedList<Habit> = LinkedList()
@@ -75,9 +63,6 @@ class HabitCardListAdapter(
         return cache.hasNoHabitGroup()
     }
 
-    /**
-     * Sets all items as not selected.
-     */
     @SuppressLint("NotifyDataSetChanged")
     override fun clearSelection() {
         if (selectedHabits.isEmpty() && selectedHabitGroups.isEmpty()) return
@@ -95,66 +80,49 @@ class HabitCardListAdapter(
         return ArrayList(selectedHabitGroups)
     }
 
-    /**
-     * Returns the item that occupies a certain position on the list
-     *
-     * @param position position of the item
-     * @return the item at given position or null if position is invalid
-     */
     @Deprecated("")
-    fun getItem(position: Int): Habit? {
-        return cache.getHabitByPosition(position)
+    fun getItemAt(position: Int): Habit? {
+        return getHabit(position)
     }
 
     fun getHabit(position: Int): Habit? {
-        return cache.getHabitByPosition(position)
+        val item = currentList.getOrNull(position)
+        return (item as? HabitListItem.HabitCardItem)?.habit
     }
 
     fun getHabitGroup(position: Int): HabitGroup? {
-        return cache.getHabitGroupByPosition(position)
-    }
-
-    override fun getItemCount(): Int {
-        return cache.itemCount
+        val item = currentList.getOrNull(position)
+        return (item as? HabitListItem.GroupItem)?.group
     }
 
     override fun getItemId(position: Int): Long {
-        return cache.getIdByPosition(position)!!
+        return currentList.getOrNull(position)?.id ?: 0L
     }
 
-    /**
-     * Returns whether list of selected items is empty.
-     *
-     * @return true if selection is empty, false otherwise
-     */
     val isSelectionEmpty: Boolean
         get() = selectedHabits.isEmpty() && selectedHabitGroups.isEmpty()
+
     val isSortable: Boolean
         get() = cache.primaryOrder == HabitList.Order.BY_POSITION
 
-    /**
-     * Notify the adapter that it has been attached to a ListView.
-     */
     fun onAttached() {
         cache.onAttached()
         midnightTimer.addListener(this)
     }
 
-    override fun onBindViewHolder(
-        holder: HabitCardViewHolder,
-        position: Int
-    ) {
+    override fun onBindViewHolder(holder: HabitCardViewHolder, position: Int) {
         if (listView == null) return
-        val habit = cache.getHabitByPosition(position)
-        if (habit != null) {
-            val score = cache.getScore(habit.id!!)
-            val checkmarks = cache.getCheckmarks(habit.id!!)
-            val notes = cache.getNotes(habit.id!!)
+        val item = getItem(position)
+        if (item is HabitListItem.HabitCardItem) {
+            val habit = item.habit
+            val score = item.score
+            val checkmarks = item.checkmarks
+            val notes = item.notes
             val selected = selectedHabits.contains(habit)
             listView!!.bindCardView(holder, habit, score, checkmarks, notes, selected)
-        } else {
-            val habitGroup = cache.getHabitGroupByPosition(position)
-            val score = cache.getScore(habitGroup!!.id!!)
+        } else if (item is HabitListItem.GroupItem) {
+            val habitGroup = item.group
+            val score = cache.getScore(habitGroup.id!!)
             val selected = selectedHabitGroups.contains(habitGroup)
             listView!!.bindGroupCardView(holder, habitGroup, score, selected)
         }
@@ -168,10 +136,7 @@ class HabitCardListAdapter(
         listView!!.detachCardView(holder)
     }
 
-    override fun onCreateViewHolder(
-        parent: ViewGroup,
-        viewType: Int
-    ): HabitCardViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): HabitCardViewHolder {
         if (viewType == 0) {
             val view = listView!!.createHabitCardView()
             return HabitCardViewHolder(view, null)
@@ -181,72 +146,25 @@ class HabitCardListAdapter(
         }
     }
 
-    // function to override getItemViewType and return the type of the view. The view can either be a HabitCardView or a HabitGroupCardView
     override fun getItemViewType(position: Int): Int {
-        return if (cache.getHabitByPosition(position) != null) {
-            0
-        } else {
-            1
-        }
+        return if (getItem(position) is HabitListItem.HabitCardItem) 0 else 1
     }
 
-    /**
-     * Notify the adapter that it has been detached from a ListView.
-     */
     fun onDetached() {
         cache.onDetached()
         midnightTimer.removeListener(this)
     }
 
-    override fun onItemChanged(position: Int) {
-        notifyItemChanged(position)
-        observable.notifyListeners()
-    }
-
-    override fun onItemInserted(position: Int) {
-        notifyItemInserted(position)
-        observable.notifyListeners()
-    }
-
-    // True if the last performReorder was a group with visible sub-habits.
-    // In that case we need notifyDataSetChanged instead of notifyItemMoved
-    // to avoid RecyclerView IndexOutOfBoundsException.
-    private var lastReorderWasGroupWithSubHabits = false
-
-    @SuppressLint("NotifyDataSetChanged")
-    override fun onItemMoved(oldPosition: Int, newPosition: Int) {
-        if (lastReorderWasGroupWithSubHabits) {
-            lastReorderWasGroupWithSubHabits = false
-            notifyDataSetChanged()
-        } else {
-            notifyItemMoved(oldPosition, newPosition)
+    override fun onListUpdated(newList: List<HabitListItem>) {
+        submitList(newList) {
+            observable.notifyListeners()
         }
-        observable.notifyListeners()
     }
 
-    override fun onItemRemoved(position: Int) {
-        notifyItemRemoved(position)
-        observable.notifyListeners()
-    }
-
-    @SuppressLint("NotifyDataSetChanged")
     override fun onRefreshFinished() {
-        notifyDataSetChanged()
-        observable.notifyListeners()
+        // Handled by onListUpdated diffing naturally
     }
 
-    /**
-     * Removes a list of habits from the adapter.
-     *
-     *
-     * Note that this only has effect on the adapter cache. The database is not
-     * modified, and the change is lost when the cache is refreshed. This method
-     * is useful for making the ListView more responsive: while we wait for the
-     * database operation to finish, the cache can be modified to reflect the
-     * changes immediately.
-     *
-     * @param selected list of habits to be removed
-     */
     override fun performRemove(selected: List<Habit>) {
         for (habit in selected) cache.remove(habit.id!!)
     }
@@ -255,31 +173,14 @@ class HabitCardListAdapter(
         for (hgr in selected) cache.remove(hgr.id!!)
     }
 
-    /**
-     * Changes the order of habits on the adapter.
-     *
-     *
-     * Note that this only has effect on the adapter cache. The database is not
-     * modified, and the change is lost when the cache is refreshed. This method
-     * is useful for making the ListView more responsive: while we wait for the
-     * database operation to finish, the cache can be modified to reflect the
-     * changes immediately.
-     *
-     * @param from the habit that should be moved
-     * @param to   the habit that currently occupies the desired position
-     */
     fun getTopLevelItems(): List<Any> {
         return cache.getTopLevelItems()
     }
 
-    fun performReorder(from: Int, to: Int) {
-        // Check if the item being reordered is a group with visible sub-habits.
-        // If so, a single notifyItemMoved won't be enough since the group occupies
-        // multiple rows — we need to track this and use notifyDataSetChanged instead.
-        val hgr = cache.getHabitGroupByPosition(from)
-        lastReorderWasGroupWithSubHabits = hgr != null && !hgr.collapsed &&
-            cache.getSubHabitCountForGroup(hgr) > 0
+    fun performReorder(from: Int, to: Int): Boolean {
+        // With DiffUtil we can safely just reorder in the cache and wait for the natural DiffResult.
         cache.reorder(from, to)
+        return true
     }
 
     override fun refresh() {
@@ -290,14 +191,6 @@ class HabitCardListAdapter(
         cache.setFilter(matcher)
     }
 
-    /**
-     * Sets the HabitCardListView that this adapter will provide data for.
-     *
-     *
-     * This object will be used to generated new HabitCardViews, upon demand.
-     *
-     * @param listView the HabitCardListView associated with this adapter
-     */
     fun setListView(listView: HabitCardListView?) {
         this.listView = listView
     }
@@ -316,19 +209,16 @@ class HabitCardListAdapter(
             preferences.defaultSecondaryOrder = value
         }
 
-    /**
-     * Selects or deselects the item at a given position.
-     *
-     * @param position position of the item to be toggled
-     */
+    @SuppressLint("NotifyDataSetChanged")
     fun toggleSelection(position: Int) {
-        val h = cache.getHabitByPosition(position)
-        val hgr = cache.getHabitGroupByPosition(position)
-        if (h != null) {
+        val item = currentList.getOrNull(position)
+        if (item is HabitListItem.HabitCardItem) {
+            val h = item.habit
             val k = selectedHabits.indexOf(h)
             if (k < 0) selectedHabits.add(h) else selectedHabits.remove(h)
             notifyDataSetChanged()
-        } else if (hgr != null) {
+        } else if (item is HabitListItem.GroupItem) {
+            val hgr = item.group
             val k = selectedHabitGroups.indexOf(hgr)
             if (k < 0) selectedHabitGroups.add(hgr) else selectedHabitGroups.remove(hgr)
             notifyDataSetChanged()
@@ -337,9 +227,7 @@ class HabitCardListAdapter(
 
     init {
         cache.setListener(this)
-        cache.setCheckmarkCount(
-            MAX_CHECKMARK_COUNT
-        )
+        cache.setCheckmarkCount(MAX_CHECKMARK_COUNT)
         cache.secondaryOrder = preferences.defaultSecondaryOrder
         cache.primaryOrder = preferences.defaultPrimaryOrder
         setHasStableIds(true)

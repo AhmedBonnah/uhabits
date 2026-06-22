@@ -171,7 +171,7 @@ class HabitGroupCardView(
             setColor(c)
         }
 
-        collapseButtonView.collapsed = source.collapsed
+        collapseButtonView.setCollapsedWithoutAnimation(source.collapsed)
 
         if (collapseButtonView.collapsed) {
             addButtonView.visibility = GONE

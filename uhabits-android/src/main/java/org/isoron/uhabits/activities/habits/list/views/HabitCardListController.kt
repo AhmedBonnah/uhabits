@@ -58,9 +58,9 @@ class HabitCardListController(
             if (habitFrom.isSubHabit()) {
                 if (habitTo != null && habitTo.isSubHabit()) {
                     if (habitFrom.group == habitTo.group) {
-                        adapter.performReorder(from, to)
+                        val isNormalMove = adapter.performReorder(from, to)
                         behavior.onReorderHabit(habitFrom, habitTo)
-                        return true
+                        return isNormalMove
                     } else {
                         val targetGroup = habitTo.group ?: return false
                         behavior.onAddHabitToGroup(habitFrom, targetGroup)
@@ -82,15 +82,15 @@ class HabitCardListController(
                     behavior.onAddHabitToGroup(habitFrom, targetGroup)
                     return false
                 } else {
-                    adapter.performReorder(from, to)
+                    val isNormalMove = adapter.performReorder(from, to)
                     behavior.onReorderTopLevelItems(adapter.getTopLevelItems())
-                    return true
+                    return isNormalMove
                 }
             }
         } else {
-            adapter.performReorder(from, to)
+            val isNormalMove = adapter.performReorder(from, to)
             behavior.onReorderTopLevelItems(adapter.getTopLevelItems())
-            return true
+            return isNormalMove
         }
         return false
     }

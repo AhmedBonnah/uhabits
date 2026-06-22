@@ -31,10 +31,10 @@ data class AddToGroupCommand(
         for (habit in selected) {
             val oldGroup = habit.group
             val sourceList = (oldGroup?.habitList ?: habitList).unfiltered
+            sourceList.move(habit, hgr.habitList.unfiltered)
             habit.groupId = hgr.id
             habit.groupUUID = hgr.uuid
             habit.group = hgr
-            sourceList.move(habit, hgr.habitList.unfiltered)
             habit.observable.notifyListeners()
         }
     }
