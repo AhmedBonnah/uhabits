@@ -285,7 +285,7 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
 
         this.reload()
         if (target is SQLiteHabitList) target.reload()
-        
+
         this.observable.notifyListeners()
         if (target is SQLiteHabitList) target.observable.notifyListeners()
     }

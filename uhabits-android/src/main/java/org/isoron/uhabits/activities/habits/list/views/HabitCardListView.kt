@@ -239,7 +239,14 @@ class HabitCardListView(
             from: ViewHolder,
             to: ViewHolder
         ): Boolean {
-            return controller.value.drop(from.adapterPosition, to.adapterPosition)
+            val moved = controller.value.drop(from.adapterPosition, to.adapterPosition)
+            if (!moved) {
+                recyclerView.post {
+                    touchHelper.attachToRecyclerView(null)
+                    touchHelper.attachToRecyclerView(recyclerView)
+                }
+            }
+            return moved
         }
 
         override fun onSwiped(
