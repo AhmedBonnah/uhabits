@@ -1,76 +1,144 @@
-/*
- * Copyright (C) 2016-2025 Álinson Santos Xavier <git@axavier.org>
- *
- * This file is part of Loop Habit Tracker.
- *
- * Loop Habit Tracker is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or (at your
- * option) any later version.
- *
- * Loop Habit Tracker is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
 package org.isoron.uhabits.activities.intro
 
-import android.graphics.Color
 import android.os.Bundle
-import androidx.fragment.app.Fragment
-import com.github.appintro.AppIntro2
-import com.github.appintro.AppIntroFragment
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import org.isoron.uhabits.R
 
-/**
- * Activity that introduces the app to the user, shown only after the app is
- * launched for the first time.
- */
-class IntroActivity : AppIntro2() {
+class IntroActivity : AppCompatActivity() {
+
+    private lateinit var viewPager: ViewPager2
+    private lateinit var btnSkip: Button
+    private lateinit var btnNext: Button
+    private lateinit var indicatorContainer: LinearLayout
+
+    private val slides = listOf(
+        IntroSlide(
+            titleRes = R.string.intro_title_1,
+            descRes = R.string.intro_description_1,
+            iconRes = R.drawable.intro_icon_1
+        ),
+        IntroSlide(
+            titleRes = R.string.intro_title_2,
+            descRes = R.string.intro_description_2,
+            iconRes = R.drawable.intro_icon_2
+        ),
+        IntroSlide(
+            titleRes = R.string.intro_title_4,
+            descRes = R.string.intro_description_4,
+            iconRes = R.drawable.intro_icon_4
+        )
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        showStatusBar(false)
+        setContentView(R.layout.activity_intro)
 
-        addSlide(
-            AppIntroFragment.newInstance(
-                getString(R.string.intro_title_1),
-                getString(R.string.intro_description_1),
-                R.drawable.intro_icon_1,
-                Color.parseColor("#194673")
-            )
-        )
+        viewPager = findViewById(R.id.viewPager)
+        btnSkip = findViewById(R.id.btnSkip)
+        btnNext = findViewById(R.id.btnNext)
+        indicatorContainer = findViewById(R.id.indicatorContainer)
 
-        addSlide(
-            AppIntroFragment.newInstance(
-                getString(R.string.intro_title_2),
-                getString(R.string.intro_description_2),
-                R.drawable.intro_icon_2,
-                Color.parseColor("#ffa726")
-            )
-        )
-
-        addSlide(
-            AppIntroFragment.newInstance(
-                getString(R.string.intro_title_4),
-                getString(R.string.intro_description_4),
-                R.drawable.intro_icon_4,
-                Color.parseColor("#9575cd")
-            )
-        )
+        setupViewPager()
+        setupIndicators()
+        setupButtons()
     }
 
-    override fun onDonePressed(currentFragment: Fragment?) {
-        super.onDonePressed(currentFragment)
-        finish()
+    private fun setupViewPager() {
+        viewPager.adapter = IntroPagerAdapter(slides)
+        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                super.onPageSelected(position)
+                updateIndicators(position)
+                if (position == slides.size - 1) {
+                    btnNext.text = getString(R.string.done_label)
+                } else {
+                    btnNext.text = getString(R.string.intro_next)
+                }
+            }
+        })
     }
 
-    override fun onSkipPressed(currentFragment: Fragment?) {
-        super.onSkipPressed(currentFragment)
-        finish()
+    private fun setupIndicators() {
+        val indicators = arrayOfNulls<ImageView>(slides.size)
+        val margin = org.isoron.uhabits.utils.InterfaceUtils.dpToPixels(this, 4f).toInt()
+        val layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            setMargins(margin, 0, margin, 0)
+        }
+
+        for (i in indicators.indices) {
+            indicators[i] = ImageView(applicationContext).apply {
+                setImageDrawable(ContextCompat.getDrawable(applicationContext, R.drawable.indicator_inactive))
+                this.layoutParams = layoutParams
+            }
+            indicatorContainer.addView(indicators[i])
+        }
+    }
+
+    private fun updateIndicators(position: Int) {
+        val childCount = indicatorContainer.childCount
+        for (i in 0 until childCount) {
+            val imageView = indicatorContainer.getChildAt(i) as ImageView
+            if (i == position) {
+                imageView.setImageDrawable(ContextCompat.getDrawable(applicationContext, R.drawable.indicator_active))
+            } else {
+                imageView.setImageDrawable(ContextCompat.getDrawable(applicationContext, R.drawable.indicator_inactive))
+            }
+        }
+    }
+
+    private fun setupButtons() {
+        btnSkip.setOnClickListener {
+            finish()
+        }
+        btnNext.setOnClickListener {
+            if (viewPager.currentItem + 1 < slides.size) {
+                viewPager.currentItem += 1
+            } else {
+                finish()
+            }
+        }
+    }
+
+    private data class IntroSlide(
+        val titleRes: Int,
+        val descRes: Int,
+        val iconRes: Int
+    )
+
+    private inner class IntroPagerAdapter(private val slides: List<IntroSlide>) :
+        RecyclerView.Adapter<IntroPagerAdapter.IntroViewHolder>() {
+
+        inner class IntroViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val slideIcon: ImageView = view.findViewById(R.id.slideIcon)
+            val slideTitle: TextView = view.findViewById(R.id.slideTitle)
+            val slideDescription: TextView = view.findViewById(R.id.slideDescription)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): IntroViewHolder {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_intro_slide, parent, false)
+            return IntroViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: IntroViewHolder, position: Int) {
+            val slide = slides[position]
+            holder.slideTitle.setText(slide.titleRes)
+            holder.slideDescription.setText(slide.descRes)
+            holder.slideIcon.setImageResource(slide.iconRes)
+        }
+
+        override fun getItemCount(): Int = slides.size
     }
 }
