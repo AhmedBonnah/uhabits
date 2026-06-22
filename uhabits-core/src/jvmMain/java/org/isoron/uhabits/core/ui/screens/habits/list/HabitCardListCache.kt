@@ -807,7 +807,7 @@ class HabitCardListCache(
             val newScore = newData.scores[id]!!
             if (oldScore != newScore) unchanged = false
 
-            if (data.positionTypes[position] != HABIT_GROUP) {
+            if (newData.positionTypes[position] != HABIT_GROUP) {
                 val oldCheckmarks = data.checkmarks[id]
                 val newCheckmarks = newData.checkmarks[id]!!
                 val oldNoteIndicators = data.notes[id]

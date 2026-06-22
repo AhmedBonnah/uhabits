@@ -49,7 +49,13 @@ class MemoryHabitList : HabitList {
     private var parent: MemoryHabitList? = null
 
     override val unfiltered: HabitList
-        get() = parent ?: this
+        get() {
+            var current: HabitList = this
+            while (current is MemoryHabitList && current.parent != null) {
+                current = current.parent!!
+            }
+            return current
+        }
 
     constructor() : super()
     constructor(
@@ -58,8 +64,8 @@ class MemoryHabitList : HabitList {
         parent: MemoryHabitList
     ) : super(matcher) {
         this.parent = parent
-        this.comparator = comparator
         this.groupId = parent.groupId
+        this.comparator = comparator
         primaryOrder = parent.primaryOrder
         secondaryOrder = parent.secondaryOrder
         parent.observable.addListener { loadFromParent() }

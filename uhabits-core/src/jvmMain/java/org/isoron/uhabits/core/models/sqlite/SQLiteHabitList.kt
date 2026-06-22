@@ -267,26 +267,27 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
 
     @Synchronized
     override fun move(habit: Habit, target: HabitList) {
-        if (target !is SQLiteHabitList) {
+        val targetGroupId = target.groupId
+        if (targetGroupId == null && target !is SQLiteHabitList) {
             super.move(habit, target)
             return
         }
 
         loadRecords()
-        target.loadRecords()
+        if (target is SQLiteHabitList) target.loadRecords()
 
         val record = repository.find(habit.id!!) ?: throw RuntimeException("habit not in database")
 
-        record.groupId = target.groupId
-        record.groupUUID = if (target.groupId != null) habit.groupUUID else null
+        record.groupId = targetGroupId
+        record.groupUUID = if (targetGroupId != null) habit.groupUUID else null
         record.position = target.size()
         repository.save(record)
 
         this.reload()
-        target.reload()
-
+        if (target is SQLiteHabitList) target.reload()
+        
         this.observable.notifyListeners()
-        target.observable.notifyListeners()
+        if (target is SQLiteHabitList) target.observable.notifyListeners()
     }
 
     @Synchronized
